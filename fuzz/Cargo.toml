@@ -1,0 +1,22 @@
+[package]
+name = "matchkit-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2021"
+repository = "https://github.com/santhsecurity/Santh"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+matchkit = { path = ".." }
+bytemuck = { version = "1", features = ["derive"] }
+
+[[bin]]
+name = "fuzz_match"
+path = "fuzz_targets/fuzz_match.rs"
+test = false
+doc = false
+
+[workspace]

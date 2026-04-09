@@ -1,11 +1,11 @@
 //! Exhaustive adversarial tests for matchkit vocabulary types.
 //!
 //! These tests verify: GPU buffer layout contracts, trait object safety,
-//! MatchSet behavior on edge-case inputs, error message quality, and
+//! `MatchSet` behavior on edge-case inputs, error message quality, and
 //! bytemuck serialization round-trips.
 
 use matchkit::error::Error;
-use matchkit::{BlockMatcher, BoxedMatcher, GpuMatch, Match, MatchSet, Matcher};
+use matchkit::{BlockMatcher, GpuMatch, Match, MatchSet, Matcher};
 use std::collections::HashMap;
 
 // ============================================================================
@@ -447,7 +447,7 @@ fn error_empty_pattern_actionable() {
         msg.contains("fix:"),
         "EmptyPattern error must contain actionable 'fix:' hint"
     );
-    assert!(msg.contains("3"), "error must mention pattern index");
+    assert!(msg.contains('3'), "error must mention pattern index");
 }
 
 #[test]
@@ -464,7 +464,7 @@ fn error_pattern_compilation_failed_actionable() {
 
 #[test]
 fn error_backend_actionable() {
-    let inner = std::io::Error::new(std::io::ErrorKind::Other, "gpu timeout");
+    let inner = std::io::Error::other("gpu timeout");
     let e = Error::Backend(Box::new(inner));
     let msg = e.to_string();
     assert!(
@@ -694,15 +694,13 @@ fn matchset_adversarial_pattern_limits() {
         assert_eq!(
             set.len(),
             limit as usize,
-            "MatchSet should handle exactly {} distinct patterns",
-            limit
+            "MatchSet should handle exactly {limit} distinct patterns"
         );
         let ids = set.pattern_ids();
         assert_eq!(
             ids.len(),
             limit as usize,
-            "Should extract exactly {} distinct pattern IDs",
-            limit
+            "Should extract exactly {limit} distinct pattern IDs"
         );
         assert_eq!(
             ids.last().unwrap(),

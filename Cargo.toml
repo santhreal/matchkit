@@ -6,23 +6,21 @@ rust-version = "1.85"
 license = "MIT"
 authors = ["Corum Collective LLC <contact@santh.io>"]
 repository = "https://github.com/santhsecurity/matchkit"
-homepage = "https://github.com/santht/matchkit"
+homepage = "https://github.com/santhsecurity/matchkit"
 documentation = "https://docs.rs/matchkit"
 description = "Vocabulary types for multi-pattern matching — Match struct, Matcher trait, shared errors"
 readme = "README.md"
 keywords = ["pattern-matching", "match", "gpu", "trait", "vocabulary"]
 categories = ["algorithms", "text-processing"]
-include = ["src/**", "Cargo.toml"]
+include = ["src/**", "Cargo.toml", "README.md", "LICENSE", "CHANGELOG.md"]
+exclude = ["Cargo.lock"]
 
 [dependencies]
 async-trait = "0.1"
 bytemuck = { version = "1", features = ["derive"] }
 thiserror = "2"
 
-[workspace]
-
 [dev-dependencies]
-faultkit = { path = "../../testing/faultkit" }
 tempfile = "3"
 criterion = "0.5"
 proptest = "1"

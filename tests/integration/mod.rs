@@ -189,4 +189,3 @@ fn matchset_filter_and_merge_performance() {
         assert!(!pair[0].overlaps(&pair[1]));
     }
 }
-mod fault_injection;

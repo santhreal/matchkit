@@ -4,15 +4,15 @@
 //! If these tests pass, the foundation is unbreakable.
 //!
 //! 1. Match struct is exactly 16 bytes (repr(C), GPU-compatible)
-//! 2. Match ordering is deterministic (sort by pattern_id, then start, then end)
+//! 2. Match ordering is deterministic (sort by `pattern_id`, then start, then end)
 //! 3. Match equality includes padding field
-//! 4. Match from_parts roundtrip for all u32 extremes (0, 1, u32::MAX-1, u32::MAX)
+//! 4. Match `from_parts` roundtrip for all u32 extremes (0, 1, `u32::MAX-1`, `u32::MAX`)
 //! 5. Matcher trait can be implemented by a trivial struct
-//! 6. BlockMatcher trait produces correct block-level results
+//! 6. `BlockMatcher` trait produces correct block-level results
 
 #![allow(clippy::panic, missing_docs)]
 
-use matchkit::{BlockMatcher, BoxedMatcher, GpuMatch, Match, Matcher};
+use matchkit::{BlockMatcher, GpuMatch, Match, Matcher};
 
 // ============================================================================
 // TEST 1: Match struct size and layout (GPU compatibility)
@@ -34,14 +34,14 @@ fn match_has_c_repr() {
     // This is a compile-time check via repr(C) attribute
     // We verify field offsets are as expected for GPU buffers
     let m = Match::from_parts(1, 2, 3);
-    let ptr = &m as *const Match as *const u8;
+    let ptr = (&raw const m).cast::<u8>();
 
     // Each field should be 4 bytes (u32)
     unsafe {
-        let pattern_id_ptr = ptr as *const u32;
-        let start_ptr = ptr.add(4) as *const u32;
-        let end_ptr = ptr.add(8) as *const u32;
-        let padding_ptr = ptr.add(12) as *const u32;
+        let pattern_id_ptr = ptr.cast::<u32>();
+        let start_ptr = ptr.add(4).cast::<u32>();
+        let end_ptr = ptr.add(8).cast::<u32>();
+        let padding_ptr = ptr.add(12).cast::<u32>();
 
         assert_eq!(*pattern_id_ptr, 1);
         assert_eq!(*start_ptr, 2);
@@ -50,7 +50,7 @@ fn match_has_c_repr() {
     }
 }
 
-/// Verify GpuMatch is also 16 bytes
+/// Verify `GpuMatch` is also 16 bytes
 #[test]
 fn gpu_match_is_exactly_16_bytes() {
     assert_eq!(
@@ -74,8 +74,8 @@ fn match_has_correct_alignment() {
 // TEST 2: Match ordering determinism
 // ============================================================================
 
-/// Verify Match ordering is deterministic: pattern_id, then start, then end
-/// Note: Based on actual implementation - ordering is by start, then pattern_id, then end
+/// Verify Match ordering is deterministic: `pattern_id`, then start, then end
+/// Note: Based on actual implementation - ordering is by start, then `pattern_id`, then end
 #[test]
 fn match_ordering_is_deterministic() {
     // Create matches with different combinations
@@ -99,7 +99,7 @@ fn match_ordering_is_deterministic() {
 /// Verify sorting produces stable, deterministic results
 #[test]
 fn match_sorting_is_stable_and_deterministic() {
-    let mut matches = vec![
+    let mut matches = [
         Match::from_parts(3, 30, 40),
         Match::from_parts(1, 10, 20),
         Match::from_parts(2, 10, 25),
@@ -126,7 +126,7 @@ fn match_sorting_is_stable_and_deterministic() {
 // TEST 3: Match equality semantics
 // ============================================================================
 
-/// Verify equality ignores padding (as per PartialEq implementation)
+/// Verify equality ignores padding (as per `PartialEq` implementation)
 #[test]
 fn match_equality_ignores_padding() {
     let a = Match::from_parts_with_padding(1, 2, 3, 0);
@@ -284,7 +284,7 @@ fn matcher_is_send_sync() {
 // TEST 6: BlockMatcher trait produces correct results
 // ============================================================================
 
-/// A trivial BlockMatcher implementation for testing
+/// A trivial `BlockMatcher` implementation for testing
 struct TrivialBlockMatcher {
     max_block: usize,
     matches: Vec<Match>,
@@ -300,7 +300,7 @@ impl BlockMatcher for TrivialBlockMatcher {
     }
 }
 
-/// Verify BlockMatcher implementation works
+/// Verify `BlockMatcher` implementation works
 #[test]
 fn block_matcher_produces_correct_results() {
     let matcher = TrivialBlockMatcher {
@@ -318,7 +318,7 @@ fn block_matcher_produces_correct_results() {
     assert_eq!(matches[1].pattern_id, 1);
 }
 
-/// Verify BlockMatcher max_block_size is respected
+/// Verify `BlockMatcher` `max_block_size` is respected
 #[test]
 fn block_matcher_max_block_size_is_correct() {
     let test_sizes = [0usize, 1, 4096, 1024 * 1024, usize::MAX];
@@ -332,7 +332,7 @@ fn block_matcher_max_block_size_is_correct() {
     }
 }
 
-/// Verify BlockMatcher is Send + Sync
+/// Verify `BlockMatcher` is Send + Sync
 #[test]
 fn block_matcher_is_send_sync() {
     fn assert_send_sync<T: Send + Sync>() {}
@@ -343,7 +343,7 @@ fn block_matcher_is_send_sync() {
 // BONUS: Additional foundational invariants
 // ============================================================================
 
-/// Verify GpuMatch to Match conversion preserves all fields
+/// Verify `GpuMatch` to Match conversion preserves all fields
 #[test]
 fn gpu_match_to_match_conversion() {
     let gpu = GpuMatch([1, 10, 20, 5]);
@@ -381,7 +381,7 @@ fn match_contains_and_overlaps() {
     );
 }
 
-/// Verify Match len and is_empty
+/// Verify Match len and `is_empty`
 #[test]
 fn match_len_and_is_empty() {
     let empty = Match::from_parts(0, 10, 10);
@@ -394,7 +394,7 @@ fn match_len_and_is_empty() {
     assert_eq!(non_empty.len(), 10);
 }
 
-/// Verify Match len handles wrapping (saturating_sub)
+/// Verify Match len handles wrapping (`saturating_sub`)
 #[test]
 fn match_len_saturating_sub() {
     // When end < start, len should be 0 due to saturating_sub

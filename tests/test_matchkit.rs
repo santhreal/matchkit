@@ -3,22 +3,21 @@
 //! These tests verify:
 //! - Match struct is exactly 16 bytes (GPU buffer layout)
 //! - Match is #[repr(C)] with correct field offsets
-//! - Match::from_parts roundtrips correctly
+//! - `Match::from_parts` roundtrips correctly
 //! - Match ordering is deterministic
 //! - Match equality includes all fields
 //! - Matcher trait is object-safe
-//! - Error types implement Send + Sync + std::error::Error
+//! - Error types implement Send + Sync + `std::error::Error`
 
 use bytemuck::Zeroable;
-use matchkit::{BlockMatcher, BoxedMatcher, Error, GpuMatch, Match, MatchSet, Matcher, Result};
+use matchkit::{BlockMatcher, Error, GpuMatch, Match, MatchSet, Matcher, Result};
 use std::error::Error as StdError;
-use std::sync::Arc;
 
 // ============================================================================
 // MATCH STRUCT TESTS
 // ============================================================================
 
-/// Test 1: Match struct is exactly 16 bytes (assert_eq!(std::mem::size_of::<Match>(), 16))
+/// Test 1: Match struct is exactly 16 bytes (`assert_eq!(std::mem::size_of::`<Match>(), 16))
 #[test]
 fn match_size_is_16_bytes() {
     assert_eq!(
@@ -49,7 +48,7 @@ fn match_field_offsets_match_gpu_layout() {
     );
 }
 
-/// Test 3: Match::from_parts roundtrip for 0, 1, u32::MAX
+/// Test 3: `Match::from_parts` roundtrip for 0, 1, `u32::MAX`
 #[test]
 fn match_from_parts_roundtrip() {
     // Test with 0 values
@@ -86,7 +85,7 @@ fn match_from_parts_roundtrip() {
     assert_eq!(m_range.len(), 1);
 }
 
-/// Test: Match::from_parts_with_padding preserves padding
+/// Test: `Match::from_parts_with_padding` preserves padding
 #[test]
 fn match_from_parts_with_padding() {
     let m = Match::from_parts_with_padding(1, 2, 3, 0xDEADBEEF);
@@ -97,7 +96,7 @@ fn match_from_parts_with_padding() {
     assert_eq!(m.padding(), 0xDEADBEEF);
 }
 
-/// Test 4: Match ordering - sort is deterministic (pattern_id, start, end)
+/// Test 4: Match ordering - sort is deterministic (`pattern_id`, start, end)
 #[test]
 fn match_ordering_is_deterministic() {
     use std::cmp::Ordering;
@@ -129,7 +128,7 @@ fn match_ordering_is_deterministic() {
     assert_eq!(m1_alt.cmp(&m4_alt), Ordering::Less);
 
     // Verify sorting produces deterministic order
-    let mut matches = vec![
+    let mut matches = [
         Match::from_parts(2, 30, 40),
         Match::from_parts(1, 10, 20),
         Match::from_parts(0, 10, 20),
@@ -151,7 +150,7 @@ fn match_ordering_is_deterministic() {
     assert_eq!(matches[4], Match::from_parts(2, 30, 40));
 }
 
-/// Test 5: Match equality includes all fields (pattern_id, start, end)
+/// Test 5: Match equality includes all fields (`pattern_id`, start, end)
 /// Note: padding is explicitly NOT included in equality comparison
 #[test]
 fn match_equality_includes_all_fields() {
@@ -201,7 +200,7 @@ fn match_contains_and_overlaps() {
     );
 }
 
-/// Test: Match len and is_empty
+/// Test: Match len and `is_empty`
 #[test]
 fn match_len_and_is_empty() {
     let empty = Match::from_parts(0, 10, 10);
@@ -217,7 +216,7 @@ fn match_len_and_is_empty() {
     assert_eq!(reversed.len(), 0); // Should saturate at 0
 }
 
-/// Test: GpuMatch to Match conversion
+/// Test: `GpuMatch` to Match conversion
 #[test]
 fn gpumatch_to_match_conversion() {
     let gpu = GpuMatch([1, 10, 20, 0xDEADBEEF]);
@@ -229,7 +228,7 @@ fn gpumatch_to_match_conversion() {
     assert_eq!(m.padding, 0xDEADBEEF);
 }
 
-/// Test: MatchSet operations
+/// Test: `MatchSet` operations
 #[test]
 fn matchset_operations() {
     let mut set = MatchSet::new();
@@ -262,7 +261,7 @@ fn matchset_operations() {
 
     // Test pattern IDs
     let mut ids = set2.pattern_ids();
-    ids.sort();
+    ids.sort_unstable();
     assert_eq!(ids, vec![0, 1]);
 }
 
@@ -294,7 +293,7 @@ fn matcher_trait_is_object_safe() {
     assert_eq!(result[0].end, 10);
 }
 
-/// Test: BlockMatcher trait is object-safe
+/// Test: `BlockMatcher` trait is object-safe
 #[test]
 fn block_matcher_trait_is_object_safe() {
     struct MockBlockMatcher;
@@ -328,7 +327,7 @@ fn matcher_requires_send_sync() {
 // ERROR TYPE TESTS
 // ============================================================================
 
-/// Test 7: Error types implement Send + Sync + std::error::Error
+/// Test 7: Error types implement Send + Sync + `std::error::Error`
 #[test]
 fn error_implements_send_sync_and_std_error() {
     fn assert_send<T: Send>() {}
@@ -381,7 +380,7 @@ fn error_variants_display() {
     assert!(msg.contains("pattern compilation failed"));
 
     // Backend error
-    let io_err = std::io::Error::new(std::io::ErrorKind::Other, "test error");
+    let io_err = std::io::Error::other("test error");
     let err = Error::Backend(Box::new(io_err));
     let _msg = err.to_string();
 }
@@ -431,7 +430,7 @@ fn match_gpu_buffer_layout() {
     assert_eq!(m2.padding, 0x12345678);
 }
 
-/// Test: GpuMatch and Match have same memory layout
+/// Test: `GpuMatch` and Match have same memory layout
 #[test]
 fn gpumatch_and_match_same_size() {
     assert_eq!(
@@ -443,7 +442,7 @@ fn gpumatch_and_match_same_size() {
     assert_eq!(std::mem::size_of::<Match>(), 16);
 }
 
-/// Test: GpuMatch can be zeroed (for buffer initialization)
+/// Test: `GpuMatch` can be zeroed (for buffer initialization)
 #[test]
 fn gpumatch_zeroable() {
     let zeroed = GpuMatch::zeroed();
@@ -486,7 +485,7 @@ fn match_ordering_boundary_conditions() {
     assert_eq!(max_vals.cmp(&min_vals), Ordering::Greater);
 }
 
-/// Test: Large-scale MatchSet operations (internet scale simulation)
+/// Test: Large-scale `MatchSet` operations (internet scale simulation)
 #[test]
 fn matchset_large_scale_operations() {
     let mut set = MatchSet::with_capacity(1000);
@@ -511,7 +510,7 @@ fn matchset_large_scale_operations() {
     assert_eq!(vec.len(), 1000);
 }
 
-/// Test: MatchSet deduplication
+/// Test: `MatchSet` deduplication
 #[test]
 fn matchset_deduplication() {
     let mut set = MatchSet::new();

@@ -13,7 +13,6 @@ readme = "README.md"
 keywords = ["pattern-matching", "match", "gpu", "trait", "vocabulary"]
 categories = ["algorithms", "text-processing"]
 include = ["src/**", "Cargo.toml", "README.md", "LICENSE", "CHANGELOG.md"]
-exclude = ["Cargo.lock"]
 
 [dependencies]
 async-trait = "0.1"

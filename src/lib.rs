@@ -135,8 +135,9 @@ mod lib_tests {
         set.insert(Match::from_parts(0, 0, 10));
         set.insert(Match::from_parts(0, 10, 20));
         set.merge_overlapping();
-        // Adjacent matches (end == start) do not overlap, so they are not merged.
-        assert_eq!(set.len(), 2);
+        // Adjacent matches (end == start) are now coalesced to prevent fragmented findings.
+        assert_eq!(set.len(), 1);
+        assert_eq!(set.as_slice()[0], Match::from_parts(0, 0, 20));
     }
 
     #[test]

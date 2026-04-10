@@ -339,11 +339,9 @@ fn match_len_saturating() {
 
 #[test]
 fn matcher_trait_works_with_generics() {
-    use async_trait::async_trait;
-
     struct DummyMatcher;
 
-    #[async_trait]
+    #[async_trait::async_trait]
     impl Matcher for DummyMatcher {
         async fn scan(&self, _data: &[u8]) -> matchkit::Result<Vec<Match>> {
             Ok(vec![])
@@ -359,11 +357,9 @@ fn matcher_trait_works_with_generics() {
 
 #[test]
 fn block_matcher_trait_works_with_generics() {
-    use async_trait::async_trait;
-
     struct DummyBlockMatcher;
 
-    #[async_trait]
+    #[async_trait::async_trait]
     impl BlockMatcher for DummyBlockMatcher {
         async fn scan_block(&self, _data: &[u8]) -> matchkit::Result<Vec<Match>> {
             Ok(vec![])

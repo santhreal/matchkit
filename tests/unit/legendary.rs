@@ -35,7 +35,6 @@
 )]
 
 
-use async_trait::async_trait;
 use matchkit::{BlockMatcher, GpuMatch, Match, Matcher};
 
 // ============================================================================
@@ -259,7 +258,7 @@ struct TrivialMatcher {
     matches: Vec<Match>,
 }
 
-#[async_trait]
+#[async_trait::async_trait]
 impl Matcher for TrivialMatcher {
     async fn scan(&self, _data: &[u8]) -> matchkit::Result<Vec<Match>> {
         Ok(self.matches.clone())
@@ -315,7 +314,7 @@ struct TrivialBlockMatcher {
     matches: Vec<Match>,
 }
 
-#[async_trait]
+#[async_trait::async_trait]
 impl BlockMatcher for TrivialBlockMatcher {
     async fn scan_block(&self, _data: &[u8]) -> matchkit::Result<Vec<Match>> {
         Ok(self.matches.clone())

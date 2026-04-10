@@ -19,7 +19,10 @@
 /// ```
 #[repr(C)]
 #[derive(Debug, Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
-pub struct GpuMatch(pub [u32; 4]);
+pub struct GpuMatch(
+    /// Raw GPU match fields: `[pattern_id, start, end, padding]`.
+    pub [u32; 4],
+);
 
 /// A match result from pattern scanning.
 ///

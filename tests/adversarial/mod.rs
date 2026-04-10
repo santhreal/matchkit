@@ -4,7 +4,6 @@
 //! MatchSet behavior on edge-case inputs, error message quality, and
 //! bytemuck serialization round-trips.
 
-use async_trait::async_trait;
 use matchkit::error::Error;
 use matchkit::{BlockMatcher, GpuMatch, Match, MatchSet, Matcher};
 use std::collections::HashMap;
@@ -177,7 +176,7 @@ fn match_overlaps_one_inside_other() {
 
 struct DummyMatcher;
 
-#[async_trait]
+#[async_trait::async_trait]
 impl Matcher for DummyMatcher {
     async fn scan(&self, _data: &[u8]) -> matchkit::Result<Vec<Match>> {
         Ok(vec![])
@@ -197,7 +196,7 @@ fn matcher_trait_is_send_sync() {
 
 struct DummyBlockMatcher;
 
-#[async_trait]
+#[async_trait::async_trait]
 impl BlockMatcher for DummyBlockMatcher {
     async fn scan_block(&self, _data: &[u8]) -> matchkit::Result<Vec<Match>> {
         Ok(vec![])
@@ -467,7 +466,7 @@ fn error_pattern_compilation_failed_actionable() {
 
 #[test]
 fn error_backend_actionable() {
-    let inner = std::io::Error::new(std::io::ErrorKind::Other, "gpu timeout");
+    let inner = std::io::Error::other("gpu timeout");
     let e = Error::Backend(Box::new(inner));
     let msg = e.to_string();
     assert!(
@@ -502,12 +501,12 @@ fn match_slice_casts_to_byte_slice() {
     let bytes: &[u8] = bytemuck::cast_slice(&matches);
     assert_eq!(bytes.len(), 32, "2 matches × 16 bytes must equal 32 bytes");
 
-    // Verify little-endian layout: first 4 bytes are pattern_id of first match
+    // Verify native-endian layout: first 4 bytes are pattern_id of first match
     let pattern_id_bytes = &bytes[0..4];
-    let expected = 0u32.to_le_bytes();
+    let expected = 0u32.to_ne_bytes();
     assert_eq!(
         pattern_id_bytes, expected,
-        "byte layout must be little-endian u32"
+        "byte layout must match native endianness"
     );
 }
 

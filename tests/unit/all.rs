@@ -24,10 +24,16 @@
     missing_docs
 )]
 
+#[path = "../adversarial/mod.rs"]
 mod adversarial;
+#[path = "../concurrent/mod.rs"]
 mod concurrent;
+#[path = "../integration/mod.rs"]
 mod integration;
 mod legendary;
+#[path = "../property/mod.rs"]
 mod property;
+#[path = "../regression/mod.rs"]
 mod regression;
+#[path = "mod.rs"]
 mod unit;

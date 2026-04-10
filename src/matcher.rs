@@ -18,15 +18,11 @@
 
 use crate::error::Result;
 use crate::Match;
-use async_trait::async_trait;
 
 /// General trait for pattern matching across any backend.
 ///
 /// Implementations must be `Send + Sync` to support concurrent scanning
 /// across multiple threads or async tasks.
-///
-/// This trait is dyn-compatible (object-safe) so it can be used as
-/// `Box<dyn Matcher>` via [`BoxedMatcher`].
 ///
 /// # Example
 ///
@@ -40,7 +36,7 @@ use async_trait::async_trait;
 ///     }
 /// }
 /// ```
-#[async_trait]
+#[async_trait::async_trait]
 pub trait Matcher: Send + Sync {
     /// Scan the provided data and return all found matches.
     async fn scan(&self, data: &[u8]) -> Result<Vec<Match>>;
@@ -53,7 +49,7 @@ pub type BoxedMatcher = Box<dyn Matcher + Send + Sync>;
 ///
 /// Implementations advertise their maximum block size so callers can
 /// chunk input appropriately for streaming pipelines.
-#[async_trait]
+#[async_trait::async_trait]
 pub trait BlockMatcher: Send + Sync {
     /// Submit a block of data for scanning.
     async fn scan_block(&self, data: &[u8]) -> Result<Vec<Match>>;

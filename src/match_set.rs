@@ -46,6 +46,10 @@ impl MatchSet {
     /// Create a match set with pre-allocated capacity (legacy interface, may panic on OOM).
     #[must_use]
     pub fn with_capacity(cap: usize) -> Self {
+        // Clamp to the maximum representable capacity for a Vec<Match> to prevent
+        // unbounded allocation requests from untrusted input.
+        let max_cap = (isize::MAX as usize) / std::mem::size_of::<Match>();
+        let cap = cap.min(max_cap);
         Self {
             matches: Vec::with_capacity(cap),
         }
@@ -118,7 +122,7 @@ impl MatchSet {
         let mut current = self.matches[0];
 
         for m in &self.matches[1..] {
-            if current.overlaps(m) {
+            if current.overlaps(m) || current.end == m.start {
                 current.end = current.end.max(m.end);
             } else {
                 merged.push(current);
@@ -139,8 +143,10 @@ impl MatchSet {
         let mut current = self.matches[0];
 
         for m in &self.matches[1..] {
-            if current.overlaps(m) {
-                // Extend current to cover both
+            if current.overlaps(m)
+                || (current.pattern_id == m.pattern_id && current.end == m.start)
+            {
+                // Extend current to cover both (overlapping, or adjacent with same pattern)
                 current.end = current.end.max(m.end);
             } else {
                 merged.push(current);
@@ -193,6 +199,22 @@ impl MatchSet {
         }
     }
 
+    /// Filter matches to only those with the given pattern ID, returning an error on OOM.
+    pub fn try_filter_by_pattern(&self, pattern_id: u32) -> crate::error::Result<Self> {
+        let mut matches = Vec::new();
+        matches.try_reserve(self.matches.len()).map_err(|e| {
+            crate::error::Error::OutOfMemory {
+                message: e.to_string(),
+            }
+        })?;
+        for m in &self.matches {
+            if m.pattern_id == pattern_id {
+                matches.push(*m);
+            }
+        }
+        Ok(Self { matches })
+    }
+
     /// Count matches for each pattern ID.
     #[must_use]
     pub fn pattern_counts(&self) -> std::collections::HashMap<u32, usize> {
@@ -203,6 +225,20 @@ impl MatchSet {
         counts
     }
 
+    /// Count matches for each pattern ID, returning an error on OOM.
+    pub fn try_pattern_counts(&self) -> crate::error::Result<std::collections::HashMap<u32, usize>> {
+        let mut counts = std::collections::HashMap::new();
+        counts.try_reserve(self.matches.len()).map_err(|e| {
+            crate::error::Error::OutOfMemory {
+                message: e.to_string(),
+            }
+        })?;
+        for m in &self.matches {
+            *counts.entry(m.pattern_id).or_insert(0) += 1;
+        }
+        Ok(counts)
+    }
+
     /// Distinct pattern IDs in the set.
     #[must_use]
     pub fn pattern_ids(&self) -> Vec<u32> {
@@ -210,6 +246,22 @@ impl MatchSet {
         ids.sort_unstable();
         ids.dedup();
         ids
+    }
+
+    /// Distinct pattern IDs in the set, returning an error on OOM.
+    pub fn try_pattern_ids(&self) -> crate::error::Result<Vec<u32>> {
+        let mut ids = Vec::new();
+        ids.try_reserve(self.matches.len()).map_err(|e| {
+            crate::error::Error::OutOfMemory {
+                message: e.to_string(),
+            }
+        })?;
+        for m in &self.matches {
+            ids.push(m.pattern_id);
+        }
+        ids.sort_unstable();
+        ids.dedup();
+        Ok(ids)
     }
 }
 

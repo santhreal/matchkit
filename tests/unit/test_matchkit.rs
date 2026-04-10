@@ -34,7 +34,6 @@
     missing_docs
 )]
 
-use async_trait::async_trait;
 use bytemuck::Zeroable;
 use matchkit::{BlockMatcher, BoxedMatcher, Error, GpuMatch, Match, MatchSet, Matcher, Result};
 use std::error::Error as StdError;
@@ -302,7 +301,7 @@ fn matcher_trait_is_object_safe() {
     // Create a mock matcher for testing
     struct MockMatcher;
 
-    #[async_trait]
+    #[async_trait::async_trait]
     impl Matcher for MockMatcher {
         async fn scan(&self, _data: &[u8]) -> Result<Vec<Match>> {
             Ok(vec![Match::from_parts(0, 0, 10)])
@@ -325,7 +324,7 @@ fn matcher_trait_is_object_safe() {
 fn block_matcher_trait_is_object_safe() {
     struct MockBlockMatcher;
 
-    #[async_trait]
+    #[async_trait::async_trait]
     impl BlockMatcher for MockBlockMatcher {
         async fn scan_block(&self, _data: &[u8]) -> Result<Vec<Match>> {
             Ok(vec![])
@@ -559,7 +558,7 @@ fn matchset_deduplication() {
 fn boxed_matcher_is_dyn_compatible() {
     struct DynMatcher;
 
-    #[async_trait]
+    #[async_trait::async_trait]
     impl Matcher for DynMatcher {
         async fn scan(&self, _data: &[u8]) -> Result<Vec<Match>> {
             Ok(vec![Match::from_parts(0, 0, 10)])

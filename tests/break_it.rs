@@ -1,3 +1,29 @@
+
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::unreadable_literal,
+    clippy::doc_markdown,
+    clippy::similar_names,
+    clippy::ptr_as_ptr,
+    clippy::borrow_as_ptr,
+    clippy::ref_as_ptr,
+    clippy::cast_ptr_alignment,
+    clippy::useless_vec,
+    clippy::items_after_statements,
+    clippy::io_other_error,
+    clippy::stable_sort_primitive,
+    clippy::unnecessary_wraps,
+    clippy::single_char_pattern,
+    clippy::cast_sign_loss,
+    clippy::uninlined_format_args,
+    clippy::cast_possible_truncation,
+    clippy::len_zero,
+    clippy::elidable_lifetime_names,
+    missing_docs
+)]
+use async_trait::async_trait;
 use matchkit::{GpuMatch, Match, MatchSet};
 use std::sync::{Arc, Mutex};
 use std::thread;
@@ -456,16 +482,8 @@ use std::mem;
 // 34. Match size must be exactly 16 bytes for GPU
 #[test]
 fn test_adv_match_size_exact_16() {
-    assert_eq!(
-        mem::size_of::<Match>(),
-        16,
-        "Match must be exactly 16 bytes"
-    );
-    assert_eq!(
-        mem::align_of::<Match>(),
-        4,
-        "Match must have alignment of 4"
-    );
+    assert_eq!(mem::size_of::<Match>(), 16, "Match must be exactly 16 bytes");
+    assert_eq!(mem::align_of::<Match>(), 4, "Match must have alignment of 4");
 }
 
 // 35. Match field pattern_id max candidate
@@ -509,13 +527,13 @@ fn test_adv_match_all_fields_and_padding_max() {
 }
 
 struct DummyAdvBlockMatcher;
+
+#[async_trait]
 impl BlockMatcher for DummyAdvBlockMatcher {
-    fn scan_block(
-        &self,
-        _data: &[u8],
-    ) -> impl std::future::Future<Output = matchkit::Result<Vec<Match>>> + Send {
-        async { Ok(vec![Match::from_parts(1, 0, 10)]) }
+    async fn scan_block(&self, _data: &[u8]) -> matchkit::Result<Vec<Match>> {
+        Ok(vec![Match::from_parts(1, 0, 10)])
     }
+
     fn max_block_size(&self) -> usize {
         usize::MAX
     }
@@ -525,11 +543,7 @@ impl BlockMatcher for DummyAdvBlockMatcher {
 #[test]
 fn test_adv_block_matcher_max_size() {
     let m = DummyAdvBlockMatcher;
-    assert_eq!(
-        m.max_block_size(),
-        usize::MAX,
-        "BlockMatcher max size handle usize::MAX"
-    );
+    assert_eq!(m.max_block_size(), usize::MAX, "BlockMatcher max size handle usize::MAX");
 }
 
 // 41. BlockMatcher trait scan_block invocation
@@ -537,7 +551,7 @@ fn test_adv_block_matcher_max_size() {
 fn test_adv_block_matcher_scan_block() {
     let m = DummyAdvBlockMatcher;
     let res = futures::executor::block_on(m.scan_block(b"test"));
-
+    
     assert!(res.is_ok());
     assert_eq!(res.unwrap().len(), 1);
 }
@@ -553,10 +567,7 @@ fn test_adv_block_matcher_impl_check() {
 // 43. Error type completeness: InputTooLarge
 #[test]
 fn test_adv_error_input_too_large() {
-    let e = Error::InputTooLarge {
-        bytes: usize::MAX,
-        max_bytes: 100,
-    };
+    let e = Error::InputTooLarge { bytes: usize::MAX, max_bytes: 100 };
     let s = e.to_string();
     assert!(s.contains("scan input is too large"));
     assert!(s.contains("fix:"));
@@ -565,10 +576,7 @@ fn test_adv_error_input_too_large() {
 // 44. Error type completeness: MatchBufferOverflow
 #[test]
 fn test_adv_error_match_buffer_overflow() {
-    let e = Error::MatchBufferOverflow {
-        count: usize::MAX,
-        max: 100,
-    };
+    let e = Error::MatchBufferOverflow { count: usize::MAX, max: 100 };
     let s = e.to_string();
     assert!(s.contains("too many matches"));
     assert!(s.contains("fix:"));
@@ -596,9 +604,7 @@ fn test_adv_error_empty_pattern() {
 // 47. Error type completeness: PatternCompilationFailed
 #[test]
 fn test_adv_error_pattern_compilation_failed() {
-    let e = Error::PatternCompilationFailed {
-        reason: "adv reason".into(),
-    };
+    let e = Error::PatternCompilationFailed { reason: "adv reason".into() };
     let s = e.to_string();
     assert!(s.contains("adv reason"));
     assert!(s.contains("pattern compilation failed"));
@@ -607,7 +613,7 @@ fn test_adv_error_pattern_compilation_failed() {
 // 48. Error type completeness: Backend
 #[test]
 fn test_adv_error_backend() {
-    let e = Error::Backend(Box::new(std::io::Error::other("adv backend")));
+    let e = Error::Backend(Box::new(std::io::Error::new(std::io::ErrorKind::Other, "adv backend")));
     let s = e.to_string();
     assert!(s.contains("adv backend"));
 }
@@ -725,11 +731,7 @@ fn test_adv_merge_chained_adjacent() {
     // Since `overlaps()` is strictly `<` and not `<=`, adjacent matches don't overlap, BUT `merge_overlapping`
     // implementation in `match_set.rs` checks `w[0].end >= w[1].start`, so they DO merge!
     // Let's test that exact behavior.
-    assert_eq!(
-        s.len(),
-        3,
-        "Adjacent matches should NOT merge since `overlaps` is strictly `<`"
-    );
+    assert_eq!(s.len(), 3, "Adjacent matches should NOT merge since `overlaps` is strictly `<`");
     assert_eq!(s.as_slice()[2].end, 30);
 }
 

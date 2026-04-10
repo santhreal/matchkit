@@ -79,7 +79,7 @@ fn concurrent_matchset_extend_and_merge() {
     }
 
     let final_set = set.lock().unwrap();
-    assert!(!final_set.is_empty(), "Set should contain merged items");
+    assert!(final_set.len() > 0, "Set should contain merged items");
 
     // Verify properties of the final set
     let slice = final_set.as_slice();
@@ -132,10 +132,7 @@ fn concurrent_matchset_32_threads_extreme_hammering() {
     let final_set = set.lock().unwrap();
     // After merging overlapping regions of j*2 to j*2+10, it'll become one big chunk for the entire length
     // But per pattern. Since there are 5 patterns, it should be 5 continuous chunks
-    assert!(
-        !final_set.is_empty(),
-        "Set should not be empty after merging"
-    );
+    assert!(final_set.len() > 0, "Set should not be empty after merging");
     assert!(
         final_set.len() <= 5,
         "All continuous matches should merge per pattern"

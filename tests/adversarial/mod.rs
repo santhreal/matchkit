@@ -1,9 +1,10 @@
 //! Exhaustive adversarial tests for matchkit vocabulary types.
 //!
 //! These tests verify: GPU buffer layout contracts, trait object safety,
-//! `MatchSet` behavior on edge-case inputs, error message quality, and
+//! MatchSet behavior on edge-case inputs, error message quality, and
 //! bytemuck serialization round-trips.
 
+use async_trait::async_trait;
 use matchkit::error::Error;
 use matchkit::{BlockMatcher, GpuMatch, Match, MatchSet, Matcher};
 use std::collections::HashMap;
@@ -176,6 +177,7 @@ fn match_overlaps_one_inside_other() {
 
 struct DummyMatcher;
 
+#[async_trait]
 impl Matcher for DummyMatcher {
     async fn scan(&self, _data: &[u8]) -> matchkit::Result<Vec<Match>> {
         Ok(vec![])
@@ -195,6 +197,7 @@ fn matcher_trait_is_send_sync() {
 
 struct DummyBlockMatcher;
 
+#[async_trait]
 impl BlockMatcher for DummyBlockMatcher {
     async fn scan_block(&self, _data: &[u8]) -> matchkit::Result<Vec<Match>> {
         Ok(vec![])
@@ -447,7 +450,7 @@ fn error_empty_pattern_actionable() {
         msg.contains("fix:"),
         "EmptyPattern error must contain actionable 'fix:' hint"
     );
-    assert!(msg.contains('3'), "error must mention pattern index");
+    assert!(msg.contains("3"), "error must mention pattern index");
 }
 
 #[test]
@@ -464,7 +467,7 @@ fn error_pattern_compilation_failed_actionable() {
 
 #[test]
 fn error_backend_actionable() {
-    let inner = std::io::Error::other("gpu timeout");
+    let inner = std::io::Error::new(std::io::ErrorKind::Other, "gpu timeout");
     let e = Error::Backend(Box::new(inner));
     let msg = e.to_string();
     assert!(
@@ -694,13 +697,15 @@ fn matchset_adversarial_pattern_limits() {
         assert_eq!(
             set.len(),
             limit as usize,
-            "MatchSet should handle exactly {limit} distinct patterns"
+            "MatchSet should handle exactly {} distinct patterns",
+            limit
         );
         let ids = set.pattern_ids();
         assert_eq!(
             ids.len(),
             limit as usize,
-            "Should extract exactly {limit} distinct pattern IDs"
+            "Should extract exactly {} distinct pattern IDs",
+            limit
         );
         assert_eq!(
             ids.last().unwrap(),

@@ -37,10 +37,17 @@ pub enum Error {
     },
 
     /// Pattern compilation failed in a backend.
-    #[error("pattern compilation failed: {reason}")]
+    #[error("pattern compilation failed: {reason}. fix: check pattern syntax and backend logs")]
     PatternCompilationFailed {
         /// The underlying error description.
         reason: String,
+    },
+
+    /// Allocation failed because the match buffer could not grow.
+    #[error("allocation failed: {message}. fix: reduce match count or increase available memory")]
+    OutOfMemory {
+        /// Description of the allocation failure.
+        message: String,
     },
 
     /// A backend-specific error not covered by the universal variants.

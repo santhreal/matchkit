@@ -58,6 +58,14 @@ impl PartialEq for Match {
 
 impl Eq for Match {}
 
+impl std::hash::Hash for Match {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.pattern_id.hash(state);
+        self.start.hash(state);
+        self.end.hash(state);
+    }
+}
+
 impl PartialOrd for Match {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         Some(self.cmp(other))
@@ -142,5 +150,11 @@ impl From<GpuMatch> for Match {
             end: value.0[2],
             padding: value.0[3],
         }
+    }
+}
+
+impl From<Match> for GpuMatch {
+    fn from(value: Match) -> Self {
+        Self([value.pattern_id, value.start, value.end, value.padding])
     }
 }

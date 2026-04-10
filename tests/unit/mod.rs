@@ -339,12 +339,17 @@ fn match_len_saturating() {
 
 #[test]
 fn matcher_trait_works_with_generics() {
+    use async_trait::async_trait;
+
     struct DummyMatcher;
+
+    #[async_trait]
     impl Matcher for DummyMatcher {
         async fn scan(&self, _data: &[u8]) -> matchkit::Result<Vec<Match>> {
             Ok(vec![])
         }
     }
+
     fn scan_generic<M: Matcher>(m: &M, data: &[u8]) -> matchkit::Result<Vec<Match>> {
         futures::executor::block_on(m.scan(data))
     }
@@ -354,7 +359,11 @@ fn matcher_trait_works_with_generics() {
 
 #[test]
 fn block_matcher_trait_works_with_generics() {
+    use async_trait::async_trait;
+
     struct DummyBlockMatcher;
+
+    #[async_trait]
     impl BlockMatcher for DummyBlockMatcher {
         async fn scan_block(&self, _data: &[u8]) -> matchkit::Result<Vec<Match>> {
             Ok(vec![])
@@ -363,6 +372,7 @@ fn block_matcher_trait_works_with_generics() {
             1024
         }
     }
+
     fn scan_block_generic<M: BlockMatcher>(m: &M, data: &[u8]) -> matchkit::Result<Vec<Match>> {
         futures::executor::block_on(m.scan_block(data))
     }

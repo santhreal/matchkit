@@ -41,17 +41,33 @@
     clippy::doc_markdown
 )]
 
+/// Shared error types for all matching backends.
 pub mod error;
+/// Internal implementation of the match set type.
 #[doc(hidden)]
 pub mod match_set;
+/// Internal implementation of the match and GPU match types.
 #[doc(hidden)]
 pub mod match_type;
+/// Trait definitions for pattern matching backends.
 pub mod matcher;
 
-pub use error::{Error, Result};
+/// Re-export of the universal error type.
+pub use error::Error;
+/// Re-export of the result type alias.
+pub use error::Result;
+/// Re-export of the sorted, deduplicated match collection.
 pub use match_set::MatchSet;
-pub use match_type::{GpuMatch, Match};
-pub use matcher::{BlockMatcher, BoxedMatcher, Matcher};
+/// Re-export of the GPU-internal match representation.
+pub use match_type::GpuMatch;
+/// Re-export of the match result struct.
+pub use match_type::Match;
+/// Re-export of the block-based matcher trait.
+pub use matcher::BlockMatcher;
+/// Re-export of the boxed matcher type alias.
+pub use matcher::BoxedMatcher;
+/// Re-export of the general matcher trait.
+pub use matcher::Matcher;
 
 #[cfg(test)]
 mod lib_tests {
@@ -119,8 +135,8 @@ mod lib_tests {
         set.insert(Match::from_parts(0, 0, 10));
         set.insert(Match::from_parts(0, 10, 20));
         set.merge_overlapping();
-        // Adjacent matches (end == start) should merge
-        assert!(set.len() <= 2);
+        // Adjacent matches (end == start) do not overlap, so they are not merged.
+        assert_eq!(set.len(), 2);
     }
 
     #[test]
@@ -142,5 +158,43 @@ mod lib_tests {
                 "matches should be sorted by start"
             );
         }
+    }
+
+    #[test]
+    fn match_field_offsets_are_gpu_compatible() {
+        assert_eq!(std::mem::offset_of!(Match, pattern_id), 0);
+        assert_eq!(std::mem::offset_of!(Match, start), 4);
+        assert_eq!(std::mem::offset_of!(Match, end), 8);
+        assert_eq!(std::mem::offset_of!(Match, padding), 12);
+    }
+
+    #[test]
+    fn match_is_send_sync() {
+        fn assert_send_sync<T: Send + Sync>() {}
+        assert_send_sync::<Match>();
+    }
+
+    #[test]
+    fn match_roundtrips_to_gpumatch() {
+        let original = Match::from_parts_with_padding(7, 100, 200, 42);
+        let gpu: GpuMatch = original.into();
+        let roundtrip: Match = gpu.into();
+        assert_eq!(roundtrip, original);
+    }
+
+    #[test]
+    fn match_hash_ignores_padding() {
+        use std::collections::hash_map::DefaultHasher;
+        use std::hash::{Hash, Hasher};
+
+        fn hash(m: &Match) -> u64 {
+            let mut hasher = DefaultHasher::new();
+            m.hash(&mut hasher);
+            hasher.finish()
+        }
+
+        let a = Match::from_parts_with_padding(1, 10, 20, 0);
+        let b = Match::from_parts_with_padding(1, 10, 20, 99);
+        assert_eq!(hash(&a), hash(&b), "hash must ignore padding like PartialEq");
     }
 }

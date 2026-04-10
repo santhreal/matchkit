@@ -36,10 +36,9 @@ impl MatchSet {
     pub fn try_with_capacity(cap: usize) -> crate::error::Result<Self> {
         let mut vec = Vec::new();
         vec.try_reserve(cap).map_err(|e| {
-            crate::error::Error::Backend(Box::new(std::io::Error::new(
-                std::io::ErrorKind::OutOfMemory,
-                e,
-            )))
+            crate::error::Error::OutOfMemory {
+                message: e.to_string(),
+            }
         })?;
         Ok(Self { matches: vec })
     }
@@ -56,10 +55,9 @@ impl MatchSet {
     pub fn try_insert(&mut self, m: Match) -> crate::error::Result<()> {
         if let Err(pos) = self.matches.binary_search(&m) {
             self.matches.try_reserve(1).map_err(|e| {
-                crate::error::Error::Backend(Box::new(std::io::Error::new(
-                    std::io::ErrorKind::OutOfMemory,
-                    e,
-                )))
+                crate::error::Error::OutOfMemory {
+                    message: e.to_string(),
+                }
             })?;
             self.matches.insert(pos, m);
         }
@@ -83,10 +81,9 @@ impl MatchSet {
         let (lower, _) = iter.size_hint();
         if lower > 0 {
             self.matches.try_reserve(lower).map_err(|e| {
-                crate::error::Error::Backend(Box::new(std::io::Error::new(
-                    std::io::ErrorKind::OutOfMemory,
-                    e,
-                )))
+                crate::error::Error::OutOfMemory {
+                    message: e.to_string(),
+                }
             })?;
         }
         for m in iter {
@@ -114,10 +111,9 @@ impl MatchSet {
         }
         let mut merged = Vec::new();
         merged.try_reserve(self.matches.len()).map_err(|e| {
-            crate::error::Error::Backend(Box::new(std::io::Error::new(
-                std::io::ErrorKind::OutOfMemory,
-                e,
-            )))
+            crate::error::Error::OutOfMemory {
+                message: e.to_string(),
+            }
         })?;
         let mut current = self.matches[0];
 

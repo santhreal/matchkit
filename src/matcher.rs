@@ -40,6 +40,27 @@ use crate::Match;
 pub trait Matcher: Send + Sync {
     /// Scan the provided data and return all found matches.
     async fn scan(&self, data: &[u8]) -> Result<Vec<Match>>;
+
+    /// Scan the provided data, appending matches into `buf`.
+    ///
+    /// Returns the number of matches appended. The default implementation
+    /// delegates to [`scan`](Self::scan) and extends `buf`, so specialized
+    /// backends should override this to avoid the intermediate allocation.
+    async fn scan_into(&self, data: &[u8], buf: &mut Vec<Match>) -> Result<usize> {
+        let matches = self.scan(data).await?;
+        let count = matches.len();
+        buf.extend(matches);
+        Ok(count)
+    }
+
+    /// Scan the provided data and return only the match count.
+    ///
+    /// The default implementation delegates to [`scan`](Self::scan).
+    /// Specialized backends should override this to avoid allocation
+    /// when only the count is needed.
+    async fn scan_count(&self, data: &[u8]) -> Result<usize> {
+        Ok(self.scan(data).await?.len())
+    }
 }
 
 /// Dynamic trait object type for matchers when generic boxing is required.
@@ -53,6 +74,24 @@ pub type BoxedMatcher = Box<dyn Matcher + Send + Sync>;
 pub trait BlockMatcher: Send + Sync {
     /// Submit a block of data for scanning.
     async fn scan_block(&self, data: &[u8]) -> Result<Vec<Match>>;
+
+    /// Scan a block, appending matches into `buf`.
+    ///
+    /// Returns the number of matches appended. The default implementation
+    /// delegates to [`scan_block`](Self::scan_block).
+    async fn scan_block_into(&self, data: &[u8], buf: &mut Vec<Match>) -> Result<usize> {
+        let matches = self.scan_block(data).await?;
+        let count = matches.len();
+        buf.extend(matches);
+        Ok(count)
+    }
+
+    /// Scan a block and return only the match count.
+    ///
+    /// The default implementation delegates to [`scan_block`](Self::scan_block).
+    async fn scan_block_count(&self, data: &[u8]) -> Result<usize> {
+        Ok(self.scan_block(data).await?.len())
+    }
 
     /// Return the maximum block size supported by the hardware or configuration.
     fn max_block_size(&self) -> usize;

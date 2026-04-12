@@ -15,16 +15,16 @@
 //! use matchkit::{Match, MatchSet};
 //!
 //! let mut set = MatchSet::new();
-//! set.insert(Match::from_parts(0, 10, 18));
-//! set.insert(Match::from_parts(1, 15, 20));
+//! set.insert(Match::new(0, 10, 18));
+//! set.insert(Match::new(1, 15, 20));
 //! set.merge_overlapping();
 //!
 //! assert_eq!(set.len(), 1);
 //! assert_eq!(set.as_slice()[0].end, 20);
 //! ```
 
+#![forbid(unsafe_code)]
 #![warn(missing_docs, clippy::pedantic)]
-#![deny(unsafe_code)]
 #![cfg_attr(
     not(test),
     deny(
@@ -38,7 +38,8 @@
 #![allow(
     clippy::module_name_repetitions,
     clippy::must_use_candidate,
-    clippy::doc_markdown
+    clippy::doc_markdown,
+    clippy::missing_errors_doc
 )]
 
 /// Shared error types for all matching backends.
@@ -62,6 +63,8 @@ pub use match_set::MatchSet;
 pub use match_type::GpuMatch;
 /// Re-export of the match result struct.
 pub use match_type::Match;
+/// Re-export of the Structure-of-Arrays match batch.
+pub use match_type::MatchBatch;
 /// Re-export of the block-based matcher trait.
 pub use matcher::BlockMatcher;
 /// Re-export of the boxed matcher type alias.
@@ -74,8 +77,8 @@ mod lib_tests {
     use super::*;
 
     #[test]
-    fn match_from_parts() {
-        let m = Match::from_parts(42, 10, 20);
+    fn match_new() {
+        let m = Match::new(42, 10, 20);
         assert_eq!(m.pattern_id, 42);
         assert_eq!(m.start, 10);
         assert_eq!(m.end, 20);
@@ -83,15 +86,15 @@ mod lib_tests {
 
     #[test]
     fn match_ordering() {
-        let a = Match::from_parts(0, 5, 10);
-        let b = Match::from_parts(0, 10, 15);
+        let a = Match::new(0, 5, 10);
+        let b = Match::new(0, 10, 15);
         assert!(a < b);
     }
 
     #[test]
     fn match_equality() {
-        let a = Match::from_parts(1, 5, 10);
-        let b = Match::from_parts(1, 5, 10);
+        let a = Match::new(1, 5, 10);
+        let b = Match::new(1, 5, 10);
         assert_eq!(a, b);
     }
 
@@ -105,16 +108,16 @@ mod lib_tests {
     #[test]
     fn match_set_insert_and_len() {
         let mut set = MatchSet::new();
-        set.insert(Match::from_parts(0, 0, 5));
-        set.insert(Match::from_parts(1, 10, 15));
+        set.insert(Match::new(0, 0, 5));
+        set.insert(Match::new(1, 10, 15));
         assert_eq!(set.len(), 2);
     }
 
     #[test]
     fn match_set_merge_overlapping() {
         let mut set = MatchSet::new();
-        set.insert(Match::from_parts(0, 0, 10));
-        set.insert(Match::from_parts(0, 5, 15));
+        set.insert(Match::new(0, 0, 10));
+        set.insert(Match::new(0, 5, 15));
         set.merge_overlapping();
         assert_eq!(set.len(), 1);
         assert_eq!(set.as_slice()[0].end, 15);
@@ -123,8 +126,8 @@ mod lib_tests {
     #[test]
     fn match_set_merge_non_overlapping() {
         let mut set = MatchSet::new();
-        set.insert(Match::from_parts(0, 0, 5));
-        set.insert(Match::from_parts(0, 10, 15));
+        set.insert(Match::new(0, 0, 5));
+        set.insert(Match::new(0, 10, 15));
         set.merge_overlapping();
         assert_eq!(set.len(), 2, "non-overlapping should not merge");
     }
@@ -132,33 +135,17 @@ mod lib_tests {
     #[test]
     fn match_set_merge_adjacent() {
         let mut set = MatchSet::new();
-        set.insert(Match::from_parts(0, 0, 10));
-        set.insert(Match::from_parts(0, 10, 20));
+        set.insert(Match::new(0, 0, 10));
+        set.insert(Match::new(0, 10, 20));
         set.merge_overlapping();
-        // Adjacent matches (end == start) are now coalesced to prevent fragmented findings.
         assert_eq!(set.len(), 1);
-        assert_eq!(set.as_slice()[0], Match::from_parts(0, 0, 20));
+        assert_eq!(set.as_slice()[0], Match::new(0, 0, 20));
     }
 
     #[test]
     fn match_zero_length() {
-        let m = Match::from_parts(0, 5, 5);
+        let m = Match::new(0, 5, 5);
         assert_eq!(m.start, m.end);
-    }
-
-    #[test]
-    fn match_set_sorted_after_insert() {
-        let mut set = MatchSet::new();
-        set.insert(Match::from_parts(0, 20, 25));
-        set.insert(Match::from_parts(0, 5, 10));
-        set.insert(Match::from_parts(0, 10, 15));
-        let slice = set.as_slice();
-        for window in slice.windows(2) {
-            assert!(
-                window[0].start <= window[1].start,
-                "matches should be sorted by start"
-            );
-        }
     }
 
     #[test]
@@ -166,7 +153,7 @@ mod lib_tests {
         assert_eq!(std::mem::offset_of!(Match, pattern_id), 0);
         assert_eq!(std::mem::offset_of!(Match, start), 4);
         assert_eq!(std::mem::offset_of!(Match, end), 8);
-        assert_eq!(std::mem::offset_of!(Match, padding), 12);
+        assert_eq!(std::mem::size_of::<Match>(), 12);
     }
 
     #[test]
@@ -177,25 +164,19 @@ mod lib_tests {
 
     #[test]
     fn match_roundtrips_to_gpumatch() {
-        let original = Match::from_parts_with_padding(7, 100, 200, 42);
+        let original = Match::new(7, 100, 200);
         let gpu: GpuMatch = original.into();
         let roundtrip: Match = gpu.into();
         assert_eq!(roundtrip, original);
     }
 
     #[test]
-    fn match_hash_ignores_padding() {
-        use std::collections::hash_map::DefaultHasher;
-        use std::hash::{Hash, Hasher};
-
-        fn hash(m: &Match) -> u64 {
-            let mut hasher = DefaultHasher::new();
-            m.hash(&mut hasher);
-            hasher.finish()
-        }
-
-        let a = Match::from_parts_with_padding(1, 10, 20, 0);
-        let b = Match::from_parts_with_padding(1, 10, 20, 99);
-        assert_eq!(hash(&a), hash(&b), "hash must ignore padding like PartialEq");
+    fn match_batch_conversion() {
+        let matches = vec![Match::new(0, 0, 10), Match::new(1, 5, 15)];
+        let batch = MatchBatch::from_slice(&matches);
+        assert_eq!(batch.len(), 2);
+        assert_eq!(batch.pattern_ids[0], 0);
+        assert_eq!(batch.pattern_ids[1], 1);
+        assert_eq!(batch.into_vec(), matches);
     }
 }

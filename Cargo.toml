@@ -1,6 +1,6 @@
 [package]
 name = "matchkit"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 rust-version = "1.85"
 license = "MIT"
@@ -20,7 +20,7 @@ bytemuck = { version = "1", features = ["derive"] }
 thiserror = "2"
 
 [dev-dependencies]
-faultkit = { path = "../../testing/faultkit" }
+faultkit = "0.1"
 tempfile = "3"
 criterion = "0.5"
 proptest = "1"

@@ -13,31 +13,29 @@ use std::collections::HashMap;
 // ============================================================================
 
 #[test]
-fn match_from_parts_zero() {
-    let m = Match::from_parts(0, 0, 0);
+fn match_new_zero() {
+    let m = Match::new(0, 0, 0);
     assert_eq!(m.pattern_id, 0, "pattern_id should be 0 for zero match");
     assert_eq!(m.start, 0, "start should be 0 for zero match");
     assert_eq!(m.end, 0, "end should be 0 for zero match");
-    assert_eq!(m.padding(), 0, "padding should default to 0");
     assert!(m.is_empty(), "zero-length match should report is_empty");
     assert_eq!(m.len(), 0, "zero-length match len should be 0");
 }
 
 #[test]
-fn match_from_parts_max_values() {
-    let m = Match::from_parts(u32::MAX, u32::MAX, u32::MAX);
+fn match_new_max_values() {
+    let m = Match::new(u32::MAX, u32::MAX, u32::MAX);
     assert_eq!(m.pattern_id, u32::MAX, "pattern_id should hold max u32");
     assert_eq!(m.start, u32::MAX, "start should hold max u32");
     assert_eq!(m.end, u32::MAX, "end should hold max u32");
-    assert_eq!(m.padding(), 0, "padding should still default to 0");
 }
 
 #[test]
-fn match_is_exactly_16_bytes() {
+fn match_is_exactly_12_bytes() {
     assert_eq!(
         std::mem::size_of::<Match>(),
-        16,
-        "Match MUST be exactly 16 bytes for GPU buffer compatibility"
+        12,
+        "Match MUST be exactly 12 bytes for optimal VRAM usage"
     );
 }
 
@@ -52,7 +50,7 @@ fn match_alignment_is_4() {
 
 #[test]
 fn match_fields_publicly_accessible() {
-    let m = Match::from_parts(7, 12, 34);
+    let m = Match::new(7, 12, 34);
     assert_eq!(
         m.pattern_id, 7,
         "pattern_id field should be publicly accessible"
@@ -62,37 +60,9 @@ fn match_fields_publicly_accessible() {
 }
 
 #[test]
-fn match_padding_zero_by_default() {
-    let m = Match::from_parts(1, 2, 3);
-    assert_eq!(m.padding(), 0, "from_parts must produce padding == 0");
-    assert_eq!(m.padding, 0, "padding field must be 0 by default");
-}
-
-#[test]
-fn match_padding_can_be_explicitly_set() {
-    let m = Match::from_parts_with_padding(1, 2, 3, 0xDEADBEEF);
-    assert_eq!(
-        m.padding(),
-        0xDEADBEEF,
-        "padding() must return explicit value"
-    );
-    assert_eq!(
-        m.padding, 0xDEADBEEF,
-        "padding field must store explicit value"
-    );
-}
-
-#[test]
-fn match_padding_ignored_in_equality() {
-    let a = Match::from_parts_with_padding(5, 10, 20, 0);
-    let b = Match::from_parts_with_padding(5, 10, 20, 99);
-    assert_eq!(a, b, "padding must NOT affect equality comparison");
-}
-
-#[test]
 fn match_len_saturating_sub() {
     // Adversarial: start > end is invalid input but must not underflow
-    let m = Match::from_parts(0, 100, 50);
+    let m = Match::new(0, 100, 50);
     assert_eq!(
         m.len(),
         0,
@@ -102,15 +72,15 @@ fn match_len_saturating_sub() {
 
 #[test]
 fn match_is_empty_when_start_equals_end() {
-    let m = Match::from_parts(0, 42, 42);
+    let m = Match::new(0, 42, 42);
     assert!(m.is_empty(), "start == end must mean is_empty == true");
     assert_eq!(m.len(), 0, "start == end must produce len == 0");
 }
 
 #[test]
 fn match_contains_same_range() {
-    let a = Match::from_parts(0, 5, 10);
-    let b = Match::from_parts(0, 5, 10);
+    let a = Match::new(0, 5, 10);
+    let b = Match::new(0, 5, 10);
     assert!(a.contains(&b), "identical ranges must contain each other");
     assert!(
         b.contains(&a),
@@ -120,16 +90,16 @@ fn match_contains_same_range() {
 
 #[test]
 fn match_contains_fully_enclosed() {
-    let outer = Match::from_parts(0, 0, 100);
-    let inner = Match::from_parts(0, 10, 90);
+    let outer = Match::new(0, 0, 100);
+    let inner = Match::new(0, 10, 90);
     assert!(outer.contains(&inner), "outer must contain inner");
     assert!(!inner.contains(&outer), "inner must NOT contain outer");
 }
 
 #[test]
 fn match_contains_not_contained() {
-    let a = Match::from_parts(0, 0, 10);
-    let b = Match::from_parts(0, 20, 30);
+    let a = Match::new(0, 0, 10);
+    let b = Match::new(0, 20, 30);
     assert!(
         !a.contains(&b),
         "disjoint ranges must not contain each other"
@@ -142,16 +112,16 @@ fn match_contains_not_contained() {
 
 #[test]
 fn match_overlaps_partial() {
-    let a = Match::from_parts(0, 0, 5);
-    let b = Match::from_parts(0, 3, 8);
+    let a = Match::new(0, 0, 5);
+    let b = Match::new(0, 3, 8);
     assert!(a.overlaps(&b), "partial overlap must be detected");
     assert!(b.overlaps(&a), "overlaps must be symmetric");
 }
 
 #[test]
 fn match_overlaps_adjacent_no_overlap() {
-    let a = Match::from_parts(0, 0, 5);
-    let b = Match::from_parts(0, 5, 10);
+    let a = Match::new(0, 0, 5);
+    let b = Match::new(0, 5, 10);
     assert!(
         !a.overlaps(&b),
         "adjacent ranges [0,5) and [5,10) must NOT overlap"
@@ -161,8 +131,8 @@ fn match_overlaps_adjacent_no_overlap() {
 
 #[test]
 fn match_overlaps_one_inside_other() {
-    let outer = Match::from_parts(0, 0, 100);
-    let inner = Match::from_parts(0, 10, 20);
+    let outer = Match::new(0, 0, 100);
+    let inner = Match::new(0, 10, 20);
     assert!(
         outer.overlaps(&inner),
         "outer must overlap with contained inner"
@@ -185,7 +155,6 @@ impl Matcher for DummyMatcher {
 
 #[test]
 fn matcher_trait_is_send_sync() {
-    // RPITIT traits are not dyn-compatible but are Send+Sync.
     fn assert_send_sync<T: Matcher + Send + Sync>() {}
     assert_send_sync::<DummyMatcher>();
 }
@@ -235,7 +204,7 @@ fn matchset_empty() {
 #[test]
 fn matchset_single_match() {
     let mut set = MatchSet::new();
-    set.insert(Match::from_parts(0, 0, 5));
+    set.insert(Match::new(0, 0, 5));
     assert!(
         !set.is_empty(),
         "MatchSet with one element must not be empty"
@@ -243,7 +212,7 @@ fn matchset_single_match() {
     assert_eq!(set.len(), 1, "MatchSet must report len == 1");
     assert_eq!(
         set.as_slice()[0],
-        Match::from_parts(0, 0, 5),
+        Match::new(0, 0, 5),
         "single match must be preserved"
     );
 }
@@ -252,7 +221,7 @@ fn matchset_single_match() {
 fn matchset_ten_thousand_matches() {
     let mut set = MatchSet::new();
     let matches: Vec<Match> = (0..10_000u32)
-        .map(|i| Match::from_parts(i % 100, i, i + 1))
+        .map(|i| Match::new(i % 100, i, i + 1))
         .collect();
     set.extend(matches);
     assert_eq!(set.len(), 10_000, "MatchSet must hold 10K distinct matches");
@@ -266,18 +235,18 @@ fn matchset_ten_thousand_matches() {
 #[test]
 fn matchset_insert_dedups_duplicates() {
     let mut set = MatchSet::new();
-    set.insert(Match::from_parts(0, 5, 10));
-    set.insert(Match::from_parts(0, 5, 10));
-    set.insert(Match::from_parts(0, 5, 10));
+    set.insert(Match::new(0, 5, 10));
+    set.insert(Match::new(0, 5, 10));
+    set.insert(Match::new(0, 5, 10));
     assert_eq!(set.len(), 1, "duplicate insertions must be deduplicated");
 }
 
 #[test]
 fn matchset_sorts_by_position() {
     let mut set = MatchSet::new();
-    set.insert(Match::from_parts(0, 30, 40));
-    set.insert(Match::from_parts(0, 10, 20));
-    set.insert(Match::from_parts(0, 20, 30));
+    set.insert(Match::new(0, 30, 40));
+    set.insert(Match::new(0, 10, 20));
+    set.insert(Match::new(0, 20, 30));
     let slice = set.as_slice();
     assert_eq!(slice[0].start, 10, "first match must have smallest start");
     assert_eq!(
@@ -294,10 +263,10 @@ fn matchset_sorts_by_position() {
 fn matchset_extend_sorts_and_dedups() {
     let mut set = MatchSet::new();
     set.extend([
-        Match::from_parts(0, 50, 60),
-        Match::from_parts(0, 10, 20),
-        Match::from_parts(0, 50, 60), // duplicate
-        Match::from_parts(0, 30, 40),
+        Match::new(0, 50, 60),
+        Match::new(0, 10, 20),
+        Match::new(0, 50, 60), // duplicate
+        Match::new(0, 30, 40),
     ]);
     assert_eq!(set.len(), 3, "extend must deduplicate and sort");
     let slice = set.as_slice();
@@ -310,10 +279,10 @@ fn matchset_extend_sorts_and_dedups() {
 fn matchset_merge_overlapping() {
     let mut set = MatchSet::new();
     set.extend([
-        Match::from_parts(0, 0, 5),
-        Match::from_parts(1, 3, 8),
-        Match::from_parts(2, 10, 15),
-        Match::from_parts(3, 12, 18),
+        Match::new(0, 0, 5),
+        Match::new(1, 3, 8),
+        Match::new(2, 10, 15),
+        Match::new(3, 12, 18),
     ]);
     set.merge_overlapping();
     let slice = set.as_slice();
@@ -343,7 +312,7 @@ fn matchset_merge_overlapping_empty_no_panic() {
 #[test]
 fn matchset_merge_overlapping_single_no_panic() {
     let mut set = MatchSet::new();
-    set.insert(Match::from_parts(0, 0, 5));
+    set.insert(Match::new(0, 0, 5));
     set.merge_overlapping();
     assert_eq!(set.len(), 1, "merge on single element must preserve it");
 }
@@ -361,8 +330,8 @@ fn matchset_filter_by_pattern_empty() {
 #[test]
 fn matchset_filter_by_pattern_no_matches() {
     let mut set = MatchSet::new();
-    set.insert(Match::from_parts(0, 0, 5));
-    set.insert(Match::from_parts(1, 10, 15));
+    set.insert(Match::new(0, 0, 5));
+    set.insert(Match::new(1, 10, 15));
     let filtered = set.filter_by_pattern(99);
     assert!(
         filtered.is_empty(),
@@ -390,11 +359,11 @@ fn matchset_pattern_ids_empty() {
 #[test]
 fn matchset_into_vec_consumes_correctly() {
     let mut set = MatchSet::new();
-    set.extend([Match::from_parts(0, 0, 5), Match::from_parts(1, 10, 15)]);
+    set.extend([Match::new(0, 0, 5), Match::new(1, 10, 15)]);
     let vec = set.into_vec();
     assert_eq!(vec.len(), 2, "into_vec must return all matches");
-    assert_eq!(vec[0], Match::from_parts(0, 0, 5));
-    assert_eq!(vec[1], Match::from_parts(1, 10, 15));
+    assert_eq!(vec[0], Match::new(0, 0, 5));
+    assert_eq!(vec[1], Match::new(1, 10, 15));
 }
 
 // ============================================================================
@@ -481,9 +450,9 @@ fn error_backend_actionable() {
 
 #[test]
 fn match_roundtrips_through_bytemuck() {
-    let original = Match::from_parts_with_padding(7, 100, 200, 42);
+    let original = Match::new(7, 100, 200);
     let bytes = bytemuck::bytes_of(&original);
-    assert_eq!(bytes.len(), 16, "Match must serialize to exactly 16 bytes");
+    assert_eq!(bytes.len(), 12, "Match must serialize to exactly 12 bytes");
 
     let restored: &Match = bytemuck::from_bytes(bytes);
     assert_eq!(
@@ -492,14 +461,13 @@ fn match_roundtrips_through_bytemuck() {
     );
     assert_eq!(restored.start, 100, "round-trip must preserve start");
     assert_eq!(restored.end, 200, "round-trip must preserve end");
-    assert_eq!(restored.padding(), 42, "round-trip must preserve padding");
 }
 
 #[test]
 fn match_slice_casts_to_byte_slice() {
-    let matches = [Match::from_parts(0, 0, 5), Match::from_parts(1, 5, 10)];
+    let matches = [Match::new(0, 0, 5), Match::new(1, 5, 10)];
     let bytes: &[u8] = bytemuck::cast_slice(&matches);
-    assert_eq!(bytes.len(), 32, "2 matches × 16 bytes must equal 32 bytes");
+    assert_eq!(bytes.len(), 24, "2 matches × 12 bytes must equal 24 bytes");
 
     // Verify native-endian layout: first 4 bytes are pattern_id of first match
     let pattern_id_bytes = &bytes[0..4];
@@ -512,15 +480,12 @@ fn match_slice_casts_to_byte_slice() {
 
 #[test]
 fn match_slice_casts_from_byte_slice() {
-    let original = [
-        Match::from_parts_with_padding(3, 10, 20, 99),
-        Match::from_parts_with_padding(4, 30, 40, 0),
-    ];
+    let original = [Match::new(3, 10, 20), Match::new(4, 30, 40)];
     let bytes: &[u8] = bytemuck::cast_slice(&original);
     let restored: &[Match] = bytemuck::cast_slice(bytes);
     assert_eq!(restored.len(), 2, "cast back must yield 2 matches");
-    assert_eq!(restored[0], Match::from_parts_with_padding(3, 10, 20, 99));
-    assert_eq!(restored[1], Match::from_parts_with_padding(4, 30, 40, 0));
+    assert_eq!(restored[0], Match::new(3, 10, 20));
+    assert_eq!(restored[1], Match::new(4, 30, 40));
 }
 
 #[test]
@@ -539,7 +504,7 @@ fn gpumatch_and_match_layout_equivalent() {
 
 #[test]
 fn gpumatch_to_match_conversion_preserves_all_fields() {
-    let gpu = GpuMatch([1, 2, 3, 4]);
+    let gpu = GpuMatch::new(1, 2, 3);
     let m: Match = gpu.into();
     assert_eq!(
         m.pattern_id, 1,
@@ -547,12 +512,11 @@ fn gpumatch_to_match_conversion_preserves_all_fields() {
     );
     assert_eq!(m.start, 2, "conversion must map field [1] to start");
     assert_eq!(m.end, 3, "conversion must map field [2] to end");
-    assert_eq!(m.padding(), 4, "conversion must map field [3] to padding");
 }
 
 #[test]
 fn adversarial_match_end_before_start() {
-    let m = Match::from_parts(0, 100, 50); // end < start
+    let m = Match::new(0, 100, 50); // end < start
     assert_eq!(m.len(), 0); // saturating sub handles it
     assert!(!m.is_empty()); // start != end
 }
@@ -562,10 +526,10 @@ fn adversarial_matchset_out_of_order_insertion() {
     let mut set = MatchSet::new();
     // Test that extend handles totally random inserts and still dedups
     set.extend([
-        Match::from_parts(2, 50, 60),
-        Match::from_parts(0, 10, 20),
-        Match::from_parts(1, 30, 40),
-        Match::from_parts(0, 10, 20), // duplicate
+        Match::new(2, 50, 60),
+        Match::new(0, 10, 20),
+        Match::new(1, 30, 40),
+        Match::new(0, 10, 20), // duplicate
     ]);
     let slice = set.as_slice();
     assert_eq!(slice.len(), 3);
@@ -576,15 +540,15 @@ fn adversarial_matchset_out_of_order_insertion() {
 
 #[test]
 fn match_overlap_overflow() {
-    let a = Match::from_parts(0, u32::MAX - 10, u32::MAX - 5);
-    let b = Match::from_parts(0, u32::MAX - 8, u32::MAX);
+    let a = Match::new(0, u32::MAX - 10, u32::MAX - 5);
+    let b = Match::new(0, u32::MAX - 8, u32::MAX);
     assert!(
         a.overlaps(&b),
         "must correctly detect overlap near u32::MAX"
     );
     assert!(b.overlaps(&a), "overlap near u32::MAX must be symmetric");
 
-    let c = Match::from_parts(0, u32::MAX - 5, u32::MAX);
+    let c = Match::new(0, u32::MAX - 5, u32::MAX);
     assert!(
         !a.overlaps(&c),
         "must handle adjacent boundaries at u32::MAX properly"
@@ -593,14 +557,14 @@ fn match_overlap_overflow() {
 
 #[test]
 fn match_len_overflow() {
-    let a = Match::from_parts(0, u32::MAX - 100, u32::MAX);
+    let a = Match::new(0, u32::MAX - 100, u32::MAX);
     assert_eq!(
         a.len(),
         100,
         "length near u32::MAX must be correctly calculated"
     );
 
-    let b = Match::from_parts(0, 10, u32::MAX);
+    let b = Match::new(0, 10, u32::MAX);
     assert_eq!(
         b.len(),
         u32::MAX - 10,
@@ -612,9 +576,9 @@ fn match_len_overflow() {
 fn matchset_merge_overflow() {
     let mut set = MatchSet::new();
     set.extend([
-        Match::from_parts(0, u32::MAX - 20, u32::MAX - 10),
-        Match::from_parts(1, u32::MAX - 15, u32::MAX - 5),
-        Match::from_parts(2, u32::MAX - 8, u32::MAX),
+        Match::new(0, u32::MAX - 20, u32::MAX - 10),
+        Match::new(1, u32::MAX - 15, u32::MAX - 5),
+        Match::new(2, u32::MAX - 8, u32::MAX),
     ]);
     set.merge_overlapping();
     let slice = set.as_slice();
@@ -630,8 +594,8 @@ fn matchset_merge_overflow() {
 #[test]
 fn match_u32_max_boundary_overflows() {
     // Tests behavior when matching limits directly hit u32 boundaries
-    let m1 = Match::from_parts(u32::MAX, u32::MAX - 10, u32::MAX);
-    let m2 = Match::from_parts(u32::MAX, u32::MAX - 5, u32::MAX);
+    let m1 = Match::new(u32::MAX, u32::MAX - 10, u32::MAX);
+    let m2 = Match::new(u32::MAX, u32::MAX - 5, u32::MAX);
 
     assert_eq!(m1.len(), 10, "m1 length should not overflow");
     assert_eq!(m2.len(), 5, "m2 length should not overflow");
@@ -660,12 +624,9 @@ fn matchset_adversarial_zero_length() {
     let mut set = MatchSet::new();
     // Inserting hundreds of zero-length matches
     for i in 0..100 {
-        set.insert(Match::from_parts(i % 10, 50, 50));
+        set.insert(Match::new(i % 10, 50, 50));
     }
     set.merge_overlapping();
-    // Zero-length matches that overlap? They are considered disjoint normally if start==end?
-    // No, `overlaps` checks `self.start < other.end && other.start < self.end`.
-    // For zero length `self.start < self.start` is FALSE, so zero length never overlaps!
     assert_eq!(
         set.len(),
         10,
@@ -687,11 +648,7 @@ fn matchset_adversarial_pattern_limits() {
     for &limit in &[8, 16, 256] {
         let mut set = MatchSet::new();
         for i in 0..limit {
-            set.insert(Match::from_parts(
-                i as u32,
-                i as u32 * 10,
-                i as u32 * 10 + 5,
-            ));
+            set.insert(Match::new(i as u32, i as u32 * 10, i as u32 * 10 + 5));
         }
         assert_eq!(
             set.len(),
@@ -718,8 +675,8 @@ fn matchset_adversarial_pattern_limits() {
 fn matchset_adversarial_bytes_all_zero_and_ones() {
     let mut set = MatchSet::new();
     // Simulate inputs from scanning an all zero buffer or an all 0xFF buffer
-    let m1 = Match::from_parts(0, 0, 0); // 0 bytes match
-    let m2 = Match::from_parts(0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF); // All 1s
+    let m1 = Match::new(0, 0, 0); // 0 bytes match
+    let m2 = Match::new(0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF); // All 1s
 
     set.insert(m1);
     set.insert(m2);
@@ -735,7 +692,7 @@ fn matchset_adversarial_bytes_all_zero_and_ones() {
     for i in 0..500 {
         // Pattern ID is alternating
         let pattern_id = if i % 2 == 0 { 0x00000000 } else { 0xFFFFFFFF };
-        set.insert(Match::from_parts(pattern_id, 10, 20));
+        set.insert(Match::new(pattern_id, 10, 20));
     }
     set.merge_overlapping();
     assert_eq!(

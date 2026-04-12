@@ -4,7 +4,7 @@ use matchkit::{Match, MatchSet};
 use proptest::prelude::*;
 
 fn mk(pattern_id: u32, start: u32, end: u32) -> Match {
-    Match::from_parts(pattern_id, start, end)
+    Match::new(pattern_id, start, end)
 }
 
 fn normalized_match(pattern_id: u32, a: u32, b: u32) -> Match {
@@ -310,23 +310,14 @@ proptest! {
     }
 
     #[test]
-    fn from_parts_is_consistent(
-        pattern_id in any::<u32>(), start in any::<u32>(), end in any::<u32>(), padding in any::<u32>()
+    fn new_is_consistent(
+        pattern_id in any::<u32>(), start in any::<u32>(), end in any::<u32>()
     ) {
-        let m1 = Match::from_parts(pattern_id, start, end);
-        let m2 = Match::from_parts_with_padding(pattern_id, start, end, padding);
+        let m = Match::new(pattern_id, start, end);
 
-        prop_assert_eq!(m1.pattern_id, pattern_id);
-        prop_assert_eq!(m2.pattern_id, pattern_id);
-
-        prop_assert_eq!(m1.start, start);
-        prop_assert_eq!(m2.start, start);
-
-        prop_assert_eq!(m1.end, end);
-        prop_assert_eq!(m2.end, end);
-
-        prop_assert_eq!(m1.padding, 0);
-        prop_assert_eq!(m2.padding, padding);
+        prop_assert_eq!(m.pattern_id, pattern_id);
+        prop_assert_eq!(m.start, start);
+        prop_assert_eq!(m.end, end);
     }
 }
 

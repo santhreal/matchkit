@@ -1,34 +1,26 @@
 //! unit tests for matchkit.
 //! See TESTING.md for the Santh testing standard.
 
-use matchkit::{BlockMatcher, Error, GpuMatch, Match, MatchSet, Matcher};
+use matchkit::{BlockMatcher, Error, GpuMatch, Match, MatchBatch, MatchSet, Matcher};
 
 #[test]
-fn match_from_parts() {
-    let m = Match::from_parts(5, 10, 20);
+fn match_new() {
+    let m = Match::new(5, 10, 20);
     assert_eq!(m.pattern_id, 5);
     assert_eq!(m.start, 10);
     assert_eq!(m.end, 20);
-    assert_eq!(m.padding(), 0);
-}
-
-#[test]
-fn match_equality_ignores_padding() {
-    let a = Match::from_parts_with_padding(1, 2, 3, 0);
-    let b = Match::from_parts_with_padding(1, 2, 3, 99);
-    assert_eq!(a, b);
 }
 
 #[test]
 fn match_inequality() {
-    let a = Match::from_parts(0, 0, 5);
-    let b = Match::from_parts(1, 0, 5);
+    let a = Match::new(0, 0, 5);
+    let b = Match::new(1, 0, 5);
     assert_ne!(a, b);
 }
 
 #[test]
 fn gpu_match_conversion() {
-    let gpu = GpuMatch([3, 100, 200, 0]);
+    let gpu = GpuMatch::new(3, 100, 200);
     let m: Match = gpu.into();
     assert_eq!(m.pattern_id, 3);
     assert_eq!(m.start, 100);
@@ -37,25 +29,26 @@ fn gpu_match_conversion() {
 
 #[test]
 fn gpu_match_is_pod() {
-    let bytes = bytemuck::bytes_of(&GpuMatch([1, 2, 3, 4]));
-    assert_eq!(bytes.len(), 16);
+    let gpu = GpuMatch::new(1, 2, 3);
+    let bytes = bytemuck::bytes_of(&gpu);
+    assert_eq!(bytes.len(), 12);
 }
 
 #[test]
-fn match_struct_is_16_bytes() {
-    assert_eq!(std::mem::size_of::<Match>(), 16);
+fn match_struct_is_12_bytes() {
+    assert_eq!(std::mem::size_of::<Match>(), 12);
     assert_eq!(std::mem::align_of::<Match>(), 4);
 }
 
 #[test]
 fn match_zero_length() {
-    let m = Match::from_parts(0, 5, 5);
+    let m = Match::new(0, 5, 5);
     assert_eq!(m.start, m.end);
 }
 
 #[test]
 fn match_max_values() {
-    let m = Match::from_parts(u32::MAX, u32::MAX, u32::MAX);
+    let m = Match::new(u32::MAX, u32::MAX, u32::MAX);
     assert_eq!(m.pattern_id, u32::MAX);
     assert_eq!(m.start, u32::MAX);
     assert_eq!(m.end, u32::MAX);
@@ -63,28 +56,21 @@ fn match_max_values() {
 
 #[test]
 fn match_inequality_by_start() {
-    let a = Match::from_parts(0, 0, 5);
-    let b = Match::from_parts(0, 1, 5);
+    let a = Match::new(0, 0, 5);
+    let b = Match::new(0, 1, 5);
     assert_ne!(a, b);
 }
 
 #[test]
 fn match_inequality_by_end() {
-    let a = Match::from_parts(0, 0, 5);
-    let b = Match::from_parts(0, 0, 6);
+    let a = Match::new(0, 0, 5);
+    let b = Match::new(0, 0, 6);
     assert_ne!(a, b);
 }
 
 #[test]
-fn gpu_match_preserves_padding() {
-    let gpu = GpuMatch([0, 10, 20, 0xFF]);
-    let m: Match = gpu.into();
-    assert_eq!(m.padding, 0xFF);
-}
-
-#[test]
 fn gpu_match_round_trip_bytes() {
-    let original = GpuMatch([7, 100, 200, 42]);
+    let original = GpuMatch::new(7, 100, 200);
     let bytes = bytemuck::bytes_of(&original);
     let restored: &GpuMatch = bytemuck::from_bytes(bytes);
     assert_eq!(restored.0, original.0);
@@ -92,7 +78,7 @@ fn gpu_match_round_trip_bytes() {
 
 #[test]
 fn match_clone_is_equal() {
-    let m = Match::from_parts_with_padding(3, 10, 20, 99);
+    let m = Match::new(3, 10, 20);
     let cloned = m;
     assert_eq!(m.pattern_id, cloned.pattern_id);
     assert_eq!(m.start, cloned.start);
@@ -101,7 +87,7 @@ fn match_clone_is_equal() {
 
 #[test]
 fn match_debug_format() {
-    let m = Match::from_parts(1, 2, 3);
+    let m = Match::new(1, 2, 3);
     let debug = format!("{m:?}");
     assert!(debug.contains("pattern_id: 1"));
     assert!(debug.contains("start: 2"));
@@ -139,41 +125,41 @@ fn error_match_buffer_overflow() {
 
 #[test]
 fn match_contains_fully_enclosed() {
-    let outer = Match::from_parts(0, 0, 10);
-    let inner = Match::from_parts(0, 2, 8);
+    let outer = Match::new(0, 0, 10);
+    let inner = Match::new(0, 2, 8);
     assert!(outer.contains(&inner));
     assert!(!inner.contains(&outer));
 }
 
 #[test]
 fn match_contains_same_range() {
-    let a = Match::from_parts(0, 5, 10);
-    let b = Match::from_parts(0, 5, 10);
+    let a = Match::new(0, 5, 10);
+    let b = Match::new(0, 5, 10);
     assert!(a.contains(&b));
 }
 
 #[test]
 fn match_overlaps_partial() {
-    let a = Match::from_parts(0, 0, 5);
-    let b = Match::from_parts(0, 3, 8);
+    let a = Match::new(0, 0, 5);
+    let b = Match::new(0, 3, 8);
     assert!(a.overlaps(&b));
     assert!(b.overlaps(&a));
 }
 
 #[test]
 fn match_overlaps_adjacent_no() {
-    let a = Match::from_parts(0, 0, 5);
-    let b = Match::from_parts(0, 5, 10);
+    let a = Match::new(0, 0, 5);
+    let b = Match::new(0, 5, 10);
     assert!(!a.overlaps(&b));
 }
 
 #[test]
 fn match_len_and_is_empty() {
-    let m = Match::from_parts(0, 3, 7);
+    let m = Match::new(0, 3, 7);
     assert_eq!(m.len(), 4);
     assert!(!m.is_empty());
 
-    let empty = Match::from_parts(0, 5, 5);
+    let empty = Match::new(0, 5, 5);
     assert_eq!(empty.len(), 0);
     assert!(empty.is_empty());
 }
@@ -181,9 +167,9 @@ fn match_len_and_is_empty() {
 #[test]
 fn match_set_insert_dedup() {
     let mut set = MatchSet::new();
-    set.insert(Match::from_parts(0, 1, 5));
-    set.insert(Match::from_parts(0, 1, 5)); // duplicate
-    set.insert(Match::from_parts(0, 0, 3));
+    set.insert(Match::new(0, 1, 5));
+    set.insert(Match::new(0, 1, 5)); // duplicate
+    set.insert(Match::new(0, 0, 3));
     assert_eq!(set.len(), 2);
     assert_eq!(set.as_slice()[0].start, 0); // sorted by start
 }
@@ -192,9 +178,9 @@ fn match_set_insert_dedup() {
 fn match_set_extend_sorts_and_dedup() {
     let mut set = MatchSet::new();
     set.extend([
-        Match::from_parts(0, 10, 20),
-        Match::from_parts(0, 0, 5),
-        Match::from_parts(0, 10, 20),
+        Match::new(0, 10, 20),
+        Match::new(0, 0, 5),
+        Match::new(0, 10, 20),
     ]);
     assert_eq!(set.len(), 2);
     assert_eq!(set.as_slice()[0].start, 0);
@@ -205,9 +191,9 @@ fn match_set_extend_sorts_and_dedup() {
 fn match_set_merge_overlapping() {
     let mut set = MatchSet::new();
     set.extend([
-        Match::from_parts(0, 0, 5),
-        Match::from_parts(1, 3, 8),
-        Match::from_parts(2, 10, 15),
+        Match::new(0, 0, 5),
+        Match::new(1, 3, 8),
+        Match::new(2, 10, 15),
     ]);
     set.merge_overlapping();
     assert_eq!(set.len(), 2);
@@ -226,7 +212,7 @@ fn match_set_empty() {
 #[test]
 fn match_set_into_vec() {
     let mut set = MatchSet::new();
-    set.insert(Match::from_parts(0, 0, 5));
+    set.insert(Match::new(0, 0, 5));
     let v = set.into_vec();
     assert_eq!(v.len(), 1);
 }
@@ -235,10 +221,10 @@ fn match_set_into_vec() {
 fn match_set_extend_is_sorted_and_deduped() {
     let mut set = MatchSet::new();
     set.extend([
-        Match::from_parts(2, 50, 60),
-        Match::from_parts(0, 10, 20),
-        Match::from_parts(1, 30, 40),
-        Match::from_parts(0, 10, 20), // duplicate
+        Match::new(2, 50, 60),
+        Match::new(0, 10, 20),
+        Match::new(1, 30, 40),
+        Match::new(0, 10, 20), // duplicate
     ]);
     let slice = set.as_slice();
     assert_eq!(slice.len(), 3);
@@ -252,10 +238,10 @@ fn match_set_extend_is_sorted_and_deduped() {
 fn merge_overlapping_produces_no_overlaps() {
     let mut set = MatchSet::new();
     set.extend([
-        Match::from_parts(0, 0, 10),
-        Match::from_parts(0, 5, 15),
-        Match::from_parts(0, 20, 30),
-        Match::from_parts(0, 25, 35),
+        Match::new(0, 0, 10),
+        Match::new(0, 5, 15),
+        Match::new(0, 20, 30),
+        Match::new(0, 25, 35),
     ]);
     set.merge_overlapping();
     let slice = set.as_slice();
@@ -268,11 +254,11 @@ fn merge_overlapping_produces_no_overlaps() {
 fn filter_by_pattern_isolates_correct_id() {
     let mut set = MatchSet::new();
     set.extend([
-        Match::from_parts(0, 0, 5),
-        Match::from_parts(1, 10, 15),
-        Match::from_parts(0, 20, 25),
-        Match::from_parts(2, 30, 35),
-        Match::from_parts(1, 40, 45),
+        Match::new(0, 0, 5),
+        Match::new(1, 10, 15),
+        Match::new(0, 20, 25),
+        Match::new(2, 30, 35),
+        Match::new(1, 40, 45),
     ]);
     let filtered = set.filter_by_pattern(1);
     assert_eq!(filtered.len(), 2);
@@ -285,9 +271,9 @@ fn filter_by_pattern_isolates_correct_id() {
 fn pattern_counts_correct() {
     let mut set = MatchSet::new();
     set.extend([
-        Match::from_parts(0, 0, 5),
-        Match::from_parts(0, 10, 15),
-        Match::from_parts(1, 20, 25),
+        Match::new(0, 0, 5),
+        Match::new(0, 10, 15),
+        Match::new(1, 20, 25),
     ]);
     let counts = set.pattern_counts();
     assert_eq!(counts[&0], 2);
@@ -298,17 +284,17 @@ fn pattern_counts_correct() {
 fn pattern_ids_returns_sorted_unique() {
     let mut set = MatchSet::new();
     set.extend([
-        Match::from_parts(5, 0, 1),
-        Match::from_parts(1, 2, 3),
-        Match::from_parts(5, 4, 5),
-        Match::from_parts(3, 6, 7),
+        Match::new(5, 0, 1),
+        Match::new(1, 2, 3),
+        Match::new(5, 4, 5),
+        Match::new(3, 6, 7),
     ]);
     assert_eq!(set.pattern_ids(), vec![1, 3, 5]);
 }
 
 #[test]
 fn match_set_with_max_u32_offsets() {
-    let m = Match::from_parts(u32::MAX, u32::MAX - 1, u32::MAX);
+    let m = Match::new(u32::MAX, u32::MAX - 1, u32::MAX);
     let mut set = MatchSet::new();
     set.insert(m);
     assert_eq!(set.len(), 1);
@@ -318,7 +304,7 @@ fn match_set_with_max_u32_offsets() {
 #[test]
 fn match_set_100k_entries() {
     let mut set = MatchSet::new();
-    set.extend((0..100_000u32).map(|i| Match::from_parts(i % 100, i, i + 1)));
+    set.extend((0..100_000u32).map(|i| Match::new(i % 100, i, i + 1)));
     assert_eq!(set.len(), 100_000);
 }
 
@@ -333,7 +319,7 @@ fn empty_match_set_operations() {
 
 #[test]
 fn match_len_saturating() {
-    let m = Match::from_parts(0, 100, 50); // start > end (invalid but shouldn't panic)
+    let m = Match::new(0, 100, 50); // start > end (invalid but shouldn't panic)
     assert_eq!(m.len(), 0); // saturating_sub
 }
 
@@ -376,4 +362,21 @@ fn block_matcher_trait_works_with_generics() {
     assert_eq!(m.max_block_size(), 1024);
     let result = scan_block_generic(&m, b"test").unwrap();
     assert_eq!(result.len(), 0);
+}
+
+#[test]
+fn match_batch_so_a_operations() {
+    let mut batch = MatchBatch::new();
+    batch.push(Match::new(1, 10, 20));
+    batch.push(Match::new(2, 30, 40));
+
+    assert_eq!(batch.len(), 2);
+    assert_eq!(batch.pattern_ids, vec![1, 2]);
+    assert_eq!(batch.starts, vec![10, 30]);
+    assert_eq!(batch.ends, vec![20, 40]);
+
+    let matches = batch.into_vec();
+    assert_eq!(matches.len(), 2);
+    assert_eq!(matches[0], Match::new(1, 10, 20));
+    assert_eq!(matches[1], Match::new(2, 30, 40));
 }

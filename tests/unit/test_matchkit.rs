@@ -1,10 +1,9 @@
-
 //! Production-grade tests for matchkit — testing Match struct, Matcher trait, and error types.
 //!
 //! These tests verify:
-//! - Match struct is exactly 16 bytes (GPU buffer layout)
+//! - Match struct is exactly 12 bytes (GPU buffer layout)
 //! - Match is #[repr(C)] with correct field offsets
-//! - Match::from_parts roundtrips correctly
+//! - Match::new roundtrips correctly
 //! - Match ordering is deterministic
 //! - Match equality includes all fields
 //! - Matcher trait is object-safe
@@ -42,13 +41,13 @@ use std::error::Error as StdError;
 // MATCH STRUCT TESTS
 // ============================================================================
 
-/// Test 1: Match struct is exactly 16 bytes (assert_eq!(std::mem::size_of::<Match>(), 16))
+/// Test 1: Match struct is exactly 12 bytes
 #[test]
-fn match_size_is_16_bytes() {
+fn match_size_is_12_bytes() {
     assert_eq!(
         std::mem::size_of::<Match>(),
-        16,
-        "Match struct must be exactly 16 bytes for GPU buffer compatibility"
+        12,
+        "Match struct must be exactly 12 bytes for optimal VRAM usage"
     );
 }
 
@@ -58,7 +57,7 @@ fn match_field_offsets_match_gpu_layout() {
     use memoffset::offset_of;
 
     // Verify field offsets for GPU buffer compatibility
-    // GpuMatch layout: [pattern_id, start, end, padding] = [0, 4, 8, 12] bytes
+    // GpuMatch layout: [pattern_id, start, end] = [0, 4, 8] bytes
     assert_eq!(
         offset_of!(Match, pattern_id),
         0,
@@ -66,27 +65,21 @@ fn match_field_offsets_match_gpu_layout() {
     );
     assert_eq!(offset_of!(Match, start), 4, "start must be at offset 4");
     assert_eq!(offset_of!(Match, end), 8, "end must be at offset 8");
-    assert_eq!(
-        offset_of!(Match, padding),
-        12,
-        "padding must be at offset 12"
-    );
 }
 
-/// Test 3: Match::from_parts roundtrip for 0, 1, u32::MAX
+/// Test 3: Match::new roundtrip for 0, 1, u32::MAX
 #[test]
 fn match_from_parts_roundtrip() {
     // Test with 0 values
-    let m0 = Match::from_parts(0, 0, 0);
+    let m0 = Match::new(0, 0, 0);
     assert_eq!(m0.pattern_id, 0);
     assert_eq!(m0.start, 0);
     assert_eq!(m0.end, 0);
-    assert_eq!(m0.padding, 0);
     assert!(m0.is_empty());
     assert_eq!(m0.len(), 0);
 
     // Test with 1 values
-    let m1 = Match::from_parts(1, 1, 1);
+    let m1 = Match::new(1, 1, 1);
     assert_eq!(m1.pattern_id, 1);
     assert_eq!(m1.start, 1);
     assert_eq!(m1.end, 1);
@@ -94,7 +87,7 @@ fn match_from_parts_roundtrip() {
     assert_eq!(m1.len(), 0);
 
     // Test with u32::MAX
-    let m_max = Match::from_parts(u32::MAX, u32::MAX, u32::MAX);
+    let m_max = Match::new(u32::MAX, u32::MAX, u32::MAX);
     assert_eq!(m_max.pattern_id, u32::MAX);
     assert_eq!(m_max.start, u32::MAX);
     assert_eq!(m_max.end, u32::MAX);
@@ -102,7 +95,7 @@ fn match_from_parts_roundtrip() {
     assert_eq!(m_max.len(), 0);
 
     // Test non-empty match with u32::MAX - 1 to u32::MAX
-    let m_range = Match::from_parts(u32::MAX, u32::MAX - 1, u32::MAX);
+    let m_range = Match::new(u32::MAX, u32::MAX - 1, u32::MAX);
     assert_eq!(m_range.pattern_id, u32::MAX);
     assert_eq!(m_range.start, u32::MAX - 1);
     assert_eq!(m_range.end, u32::MAX);
@@ -110,33 +103,17 @@ fn match_from_parts_roundtrip() {
     assert_eq!(m_range.len(), 1);
 }
 
-/// Test: Match::from_parts_with_padding preserves padding
-#[test]
-fn match_from_parts_with_padding() {
-    let m = Match::from_parts_with_padding(1, 2, 3, 0xDEADBEEF);
-    assert_eq!(m.pattern_id, 1);
-    assert_eq!(m.start, 2);
-    assert_eq!(m.end, 3);
-    assert_eq!(m.padding, 0xDEADBEEF);
-    assert_eq!(m.padding(), 0xDEADBEEF);
-}
-
-/// Test 4: Match ordering - sort is deterministic (pattern_id, start, end)
+/// Test 4: Match ordering - sort is deterministic (start, pattern_id, end)
 #[test]
 fn match_ordering_is_deterministic() {
     use std::cmp::Ordering;
 
-    let m1 = Match::from_parts(0, 10, 20);
-    let m2 = Match::from_parts(1, 10, 20);
-    let m3 = Match::from_parts(0, 15, 20);
-    let _m4 = Match::from_parts(0, 10, 25);
-    let m5 = Match::from_parts(0, 10, 20); // Same as m1
+    let m1 = Match::new(0, 10, 20);
+    let m2 = Match::new(1, 10, 20);
+    let m3 = Match::new(0, 15, 20);
+    let m5 = Match::new(0, 10, 20); // Same as m1
 
     // Test ordering - sorted by (start, pattern_id, end) based on Ord impl
-    // From match_type.rs: self.start.cmp(&other.start)
-    //                     .then(self.pattern_id.cmp(&other.pattern_id))
-    //                     .then(self.end.cmp(&other.end))
-
     // Same match equals
     assert_eq!(m1.cmp(&m5), Ordering::Equal);
     assert_eq!(m1.partial_cmp(&m5), Some(Ordering::Equal));
@@ -148,17 +125,17 @@ fn match_ordering_is_deterministic() {
     assert_eq!(m1.cmp(&m2), Ordering::Less);
 
     // Same start, same pattern_id: m1 (end=20) < m4 (end=25)
-    let m1_alt = Match::from_parts(0, 10, 20);
-    let m4_alt = Match::from_parts(0, 10, 25);
+    let m1_alt = Match::new(0, 10, 20);
+    let m4_alt = Match::new(0, 10, 25);
     assert_eq!(m1_alt.cmp(&m4_alt), Ordering::Less);
 
     // Verify sorting produces deterministic order
     let mut matches = vec![
-        Match::from_parts(2, 30, 40),
-        Match::from_parts(1, 10, 20),
-        Match::from_parts(0, 10, 20),
-        Match::from_parts(1, 10, 15),
-        Match::from_parts(1, 5, 10),
+        Match::new(2, 30, 40),
+        Match::new(1, 10, 20),
+        Match::new(0, 10, 20),
+        Match::new(1, 10, 15),
+        Match::new(1, 5, 10),
     ];
     matches.sort();
 
@@ -168,46 +145,37 @@ fn match_ordering_is_deterministic() {
     // (1, 10, 15) - start=10, pattern_id=1, end=15
     // (1, 10, 20) - start=10, pattern_id=1, end=20
     // (2, 30, 40) - start=30
-    assert_eq!(matches[0], Match::from_parts(1, 5, 10));
-    assert_eq!(matches[1], Match::from_parts(0, 10, 20));
-    assert_eq!(matches[2], Match::from_parts(1, 10, 15));
-    assert_eq!(matches[3], Match::from_parts(1, 10, 20));
-    assert_eq!(matches[4], Match::from_parts(2, 30, 40));
+    assert_eq!(matches[0], Match::new(1, 5, 10));
+    assert_eq!(matches[1], Match::new(0, 10, 20));
+    assert_eq!(matches[2], Match::new(1, 10, 15));
+    assert_eq!(matches[3], Match::new(1, 10, 20));
+    assert_eq!(matches[4], Match::new(2, 30, 40));
 }
 
 /// Test 5: Match equality includes all fields (pattern_id, start, end)
-/// Note: padding is explicitly NOT included in equality comparison
 #[test]
 fn match_equality_includes_all_fields() {
-    let m1 = Match::from_parts(1, 10, 20);
-    let m2 = Match::from_parts(1, 10, 20);
-    let m3 = Match::from_parts(2, 10, 20); // Different pattern_id
-    let m4 = Match::from_parts(1, 11, 20); // Different start
-    let m5 = Match::from_parts(1, 10, 21); // Different end
+    let m1 = Match::new(1, 10, 20);
+    let m2 = Match::new(1, 10, 20);
+    let m3 = Match::new(2, 10, 20); // Different pattern_id
+    let m4 = Match::new(1, 11, 20); // Different start
+    let m5 = Match::new(1, 10, 21); // Different end
 
     // Equality
     assert_eq!(m1, m2, "Identical matches should be equal");
     assert_ne!(m1, m3, "Different pattern_id should not be equal");
     assert_ne!(m1, m4, "Different start should not be equal");
     assert_ne!(m1, m5, "Different end should not be equal");
-
-    // Test that padding does NOT affect equality
-    let m_with_padding = Match::from_parts_with_padding(1, 10, 20, 0xDEADBEEF);
-    let m_without_padding = Match::from_parts(1, 10, 20);
-    assert_eq!(
-        m_with_padding, m_without_padding,
-        "Padding should not affect equality"
-    );
 }
 
 /// Test: Match contains and overlaps methods
 #[test]
 fn match_contains_and_overlaps() {
-    let outer = Match::from_parts(0, 10, 30);
-    let inner = Match::from_parts(0, 15, 25);
-    let overlapping = Match::from_parts(0, 20, 40);
-    let disjoint = Match::from_parts(0, 40, 50);
-    let edge_touching = Match::from_parts(0, 30, 40); // end == other.start
+    let outer = Match::new(0, 10, 30);
+    let inner = Match::new(0, 15, 25);
+    let overlapping = Match::new(0, 20, 40);
+    let disjoint = Match::new(0, 40, 50);
+    let edge_touching = Match::new(0, 30, 40); // end == other.start
 
     // Contains
     assert!(outer.contains(&inner), "Outer should contain inner");
@@ -228,29 +196,28 @@ fn match_contains_and_overlaps() {
 /// Test: Match len and is_empty
 #[test]
 fn match_len_and_is_empty() {
-    let empty = Match::from_parts(0, 10, 10);
+    let empty = Match::new(0, 10, 10);
     assert!(empty.is_empty());
     assert_eq!(empty.len(), 0);
 
-    let non_empty = Match::from_parts(0, 10, 20);
+    let non_empty = Match::new(0, 10, 20);
     assert!(!non_empty.is_empty());
     assert_eq!(non_empty.len(), 10);
 
     // Test saturating subtraction for len
-    let reversed = Match::from_parts(0, 20, 10);
+    let reversed = Match::new(0, 20, 10);
     assert_eq!(reversed.len(), 0); // Should saturate at 0
 }
 
 /// Test: GpuMatch to Match conversion
 #[test]
 fn gpumatch_to_match_conversion() {
-    let gpu = GpuMatch([1, 10, 20, 0xDEADBEEF]);
+    let gpu = GpuMatch::new(1, 10, 20);
     let m: Match = gpu.into();
 
     assert_eq!(m.pattern_id, 1);
     assert_eq!(m.start, 10);
     assert_eq!(m.end, 20);
-    assert_eq!(m.padding, 0xDEADBEEF);
 }
 
 /// Test: MatchSet operations
@@ -260,8 +227,8 @@ fn matchset_operations() {
     assert!(set.is_empty());
     assert_eq!(set.len(), 0);
 
-    set.insert(Match::from_parts(0, 10, 20));
-    set.insert(Match::from_parts(0, 15, 25));
+    set.insert(Match::new(0, 10, 20));
+    set.insert(Match::new(0, 15, 25));
     assert_eq!(set.len(), 2);
 
     // Test merge_overlapping
@@ -272,9 +239,9 @@ fn matchset_operations() {
 
     // Test pattern filtering
     let mut set2 = MatchSet::new();
-    set2.insert(Match::from_parts(0, 10, 20));
-    set2.insert(Match::from_parts(1, 15, 25));
-    set2.insert(Match::from_parts(0, 30, 40));
+    set2.insert(Match::new(0, 10, 20));
+    set2.insert(Match::new(1, 15, 25));
+    set2.insert(Match::new(0, 30, 40));
 
     let filtered = set2.filter_by_pattern(0);
     assert_eq!(filtered.len(), 2);
@@ -295,7 +262,6 @@ fn matchset_operations() {
 // ============================================================================
 
 /// Test 6: Matcher trait is object-safe
-/// We verify this by creating trait objects and using them in containers
 #[test]
 fn matcher_trait_is_object_safe() {
     // Create a mock matcher for testing
@@ -304,7 +270,7 @@ fn matcher_trait_is_object_safe() {
     #[async_trait::async_trait]
     impl Matcher for MockMatcher {
         async fn scan(&self, _data: &[u8]) -> Result<Vec<Match>> {
-            Ok(vec![Match::from_parts(0, 0, 10)])
+            Ok(vec![Match::new(0, 0, 10)])
         }
     }
 
@@ -445,10 +411,10 @@ fn result_type_alias() {
 #[test]
 fn match_gpu_buffer_layout() {
     // Verify Match is Pod (Plain Old Data) for GPU buffer compatibility
-    let m = Match::from_parts_with_padding(1, 10, 20, 0x12345678);
+    let m = Match::new(1, 10, 20);
 
     // Convert to bytes (simulating GPU buffer write)
-    let bytes: [u8; 16] = bytemuck::cast(m);
+    let bytes: [u8; 12] = bytemuck::cast(m);
 
     // Convert back from bytes (simulating GPU buffer read)
     let m2: Match = bytemuck::cast(bytes);
@@ -456,7 +422,6 @@ fn match_gpu_buffer_layout() {
     assert_eq!(m2.pattern_id, 1);
     assert_eq!(m2.start, 10);
     assert_eq!(m2.end, 20);
-    assert_eq!(m2.padding, 0x12345678);
 }
 
 /// Test: GpuMatch and Match have same memory layout
@@ -467,21 +432,20 @@ fn gpumatch_and_match_same_size() {
         std::mem::size_of::<Match>(),
         "GpuMatch and Match must have same size"
     );
-    assert_eq!(std::mem::size_of::<GpuMatch>(), 16);
-    assert_eq!(std::mem::size_of::<Match>(), 16);
+    assert_eq!(std::mem::size_of::<GpuMatch>(), 12);
+    assert_eq!(std::mem::size_of::<Match>(), 12);
 }
 
 /// Test: GpuMatch can be zeroed (for buffer initialization)
 #[test]
 fn gpumatch_zeroable() {
     let zeroed = GpuMatch::zeroed();
-    assert_eq!(zeroed.0, [0, 0, 0, 0]);
+    assert_eq!(zeroed.0, [0, 0, 0]);
 
     let m: Match = zeroed.into();
     assert_eq!(m.pattern_id, 0);
     assert_eq!(m.start, 0);
     assert_eq!(m.end, 0);
-    assert_eq!(m.padding, 0);
 }
 
 // ============================================================================
@@ -492,11 +456,11 @@ fn gpumatch_zeroable() {
 #[test]
 fn match_handles_overflow_gracefully() {
     // Maximum u32 values
-    let m = Match::from_parts(u32::MAX, u32::MAX - 1, u32::MAX);
+    let m = Match::new(u32::MAX, u32::MAX - 1, u32::MAX);
     assert_eq!(m.len(), 1); // Should not overflow
 
     // Reversed range (start > end) should return 0 len via saturating_sub
-    let reversed = Match::from_parts(0, 100, 50);
+    let reversed = Match::new(0, 100, 50);
     assert_eq!(reversed.len(), 0);
 }
 
@@ -505,8 +469,8 @@ fn match_handles_overflow_gracefully() {
 fn match_ordering_boundary_conditions() {
     use std::cmp::Ordering;
 
-    let min_vals = Match::from_parts(0, 0, 0);
-    let max_vals = Match::from_parts(u32::MAX, u32::MAX, u32::MAX);
+    let min_vals = Match::new(0, 0, 0);
+    let max_vals = Match::new(u32::MAX, u32::MAX, u32::MAX);
 
     assert_eq!(min_vals.cmp(&min_vals), Ordering::Equal);
     assert_eq!(max_vals.cmp(&max_vals), Ordering::Equal);
@@ -521,7 +485,7 @@ fn matchset_large_scale_operations() {
 
     // Insert 1000 non-overlapping matches
     for i in 0..1000_u32 {
-        set.insert(Match::from_parts(i % 10, i * 10, i * 10 + 5));
+        set.insert(Match::new(i % 10, i * 10, i * 10 + 5));
     }
 
     assert_eq!(set.len(), 1000);
@@ -546,7 +510,7 @@ fn matchset_deduplication() {
 
     // Insert same match multiple times
     for _ in 0..10 {
-        set.insert(Match::from_parts(1, 10, 20));
+        set.insert(Match::new(1, 10, 20));
     }
 
     // Should only have one entry
@@ -561,7 +525,7 @@ fn boxed_matcher_is_dyn_compatible() {
     #[async_trait::async_trait]
     impl Matcher for DynMatcher {
         async fn scan(&self, _data: &[u8]) -> Result<Vec<Match>> {
-            Ok(vec![Match::from_parts(0, 0, 10)])
+            Ok(vec![Match::new(0, 0, 10)])
         }
     }
 

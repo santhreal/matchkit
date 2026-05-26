@@ -19,4 +19,16 @@ path = "fuzz_targets/fuzz_match.rs"
 test = false
 doc = false
 
+[[bin]]
+name = "fuzz_matchset"
+path = "fuzz_targets/fuzz_matchset.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "fuzz_batch"
+path = "fuzz_targets/fuzz_batch.rs"
+test = false
+doc = false
+
 [workspace]

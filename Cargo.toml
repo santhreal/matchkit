@@ -35,6 +35,10 @@ missing_docs = "warn"
 name = "matchset_bench"
 harness = false
 
+[[bench]]
+name = "batch_bench"
+harness = false
+
 [[test]]
 name = "unit_all"
 path = "tests/unit/all.rs"
@@ -66,4 +70,20 @@ path = "tests/integration/mod.rs"
 [[test]]
 name = "property"
 path = "tests/property/mod.rs"
+
+[[test]]
+name = "campaign_s_perf_match"
+path = "tests/campaign_s_perf_match.rs"
+
+[[test]]
+name = "campaign_s_proptest_03"
+path = "tests/campaign_s_proptest_03.rs"
+
+[[test]]
+name = "campaign_s_proptest_03_ext"
+path = "tests/campaign_s_proptest_03_ext.rs"
+
+[[test]]
+name = "campaign_s_proptest_03_ext_min"
+path = "tests/campaign_s_proptest_03_ext_min.rs"
 

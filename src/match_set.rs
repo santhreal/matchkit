@@ -125,9 +125,9 @@ impl MatchSet {
 
         for i in 1..self.matches.len() {
             let m = self.matches[i];
-            // Merge if they overlap OR if they are adjacent with same pattern ID.
-            if current.overlaps(&m)
-                || (current.pattern_id == m.pattern_id && current.end == m.start)
+            // Merge only same-pattern overlaps or adjacent runs.
+            if current.pattern_id == m.pattern_id
+                && (current.overlaps(&m) || current.end == m.start)
             {
                 current.end = current.end.max(m.end);
             } else {

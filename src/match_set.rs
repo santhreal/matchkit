@@ -42,13 +42,22 @@ impl MatchSet {
         Ok(Self { matches: vec })
     }
 
+    /// Maximum element capacity for the backing `Vec<Match>`, i.e. the largest
+    /// request that cannot trigger a capacity-overflow panic.
+    #[must_use]
+    fn max_capacity() -> usize {
+        (isize::MAX as usize) / std::mem::size_of::<Match>()
+    }
+
     /// Create a match set with pre-allocated capacity.
+    ///
+    /// `cap` is clamped to [`max_capacity`](Self::max_capacity) to prevent a
+    /// capacity-overflow panic from untrusted input. This constructor still
+    /// aborts if the underlying allocation fails; for OOM-safe allocation of
+    /// untrusted sizes use [`try_with_capacity`](Self::try_with_capacity).
     #[must_use]
     pub fn with_capacity(cap: usize) -> Self {
-        // Clamp to the maximum representable capacity for a Vec<Match> to prevent
-        // unbounded allocation requests from untrusted input.
-        let max_cap = (isize::MAX as usize) / std::mem::size_of::<Match>();
-        let cap = cap.min(max_cap);
+        let cap = cap.min(Self::max_capacity());
         Self {
             matches: Vec::with_capacity(cap),
         }
@@ -89,6 +98,15 @@ impl MatchSet {
                 })?;
         }
         for m in iter {
+            // size_hint's lower bound is only a hint; an iterator can yield more.
+            // try_reserve(1) each push (a no-op when spare capacity exists) keeps
+            // every element OOM-safe instead of letting the infallible `push`
+            // realloc and abort past the reserved prefix.
+            self.matches
+                .try_reserve(1)
+                .map_err(|e| crate::error::Error::OutOfMemory {
+                    message: e.to_string(),
+                })?;
             self.matches.push(m);
         }
         self.matches.sort_unstable();
@@ -114,7 +132,14 @@ impl MatchSet {
         Ok(())
     }
 
-    /// Merge overlapping matches into a minimal covering set in-place.
+    /// Merge into a minimal covering set in place.
+    ///
+    /// Genuinely overlapping byte ranges are collapsed regardless of pattern id
+    /// (the merged span keeps the earlier-starting match's id), so the result is
+    /// the minimal set of intervals covering every matched byte. Matches that
+    /// only *touch* (`prev.end == next.start`, including zero-length points) are
+    /// fused only when they share a pattern, so distinct findings sitting at the
+    /// same boundary are not silently coalesced.
     pub fn merge_overlapping(&mut self) {
         if self.matches.len() < 2 {
             return;
@@ -125,9 +150,13 @@ impl MatchSet {
 
         for i in 1..self.matches.len() {
             let m = self.matches[i];
-            // Merge only same-pattern overlaps or adjacent runs.
-            if current.pattern_id == m.pattern_id
-                && (current.overlaps(&m) || current.end == m.start)
+            // Minimal covering set (matches are sorted start-first): genuinely
+            // overlapping byte ranges collapse regardless of pattern id, keeping
+            // the earlier match's id. Merely touching/adjacent runs (`end ==
+            // start`, which includes zero-length points) fuse only when they
+            // share a pattern, so distinct patterns at one boundary stay separate.
+            if current.overlaps(&m)
+                || (current.end == m.start && current.pattern_id == m.pattern_id)
             {
                 current.end = current.end.max(m.end);
             } else {

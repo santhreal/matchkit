@@ -16,7 +16,7 @@ pub enum Error {
         max_bytes: usize,
     },
 
-    /// Match buffer overflow — too many matches for the configured buffer.
+    /// Match buffer overflow (too many matches for the configured buffer).
     #[error("too many matches ({count} exceeds {max}). fix: reduce pattern count, split input, or increase buffer size")]
     MatchBufferOverflow {
         /// Actual number of matches found.

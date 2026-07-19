@@ -1,4 +1,4 @@
-//! LEGENDARY TESTS for matchkit — Foundation crate verification
+//! depth TESTS for matchkit: Foundation crate verification
 //!
 //! These tests verify the absolute core invariants of the matchkit crate.
 //! If these tests pass, the foundation is unbreakable.
@@ -370,7 +370,10 @@ fn match_len_and_is_empty() {
 fn match_len_saturating_sub() {
     let m = Match::new(0, 20, 10);
     assert_eq!(m.len(), 0);
-    assert!(!m.is_empty(), "is_empty checks start==end, not len()==0");
+    // is_empty uses `start >= end` (match_type.rs:127 fix), so an inverted
+    // range is empty AND zero-length. The old assertion documented the pre-fix
+    // `start == end` behavior and is now wrong.
+    assert!(m.is_empty(), "an inverted range (start>end) is empty");
 }
 
 /// Verify bytemuck compatibility (Zeroable + Pod)

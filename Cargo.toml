@@ -5,10 +5,10 @@ edition = "2021"
 rust-version = "1.85"
 license = "MIT"
 authors = ["Corum Collective LLC <contact@santh.io>"]
-repository = "https://github.com/santhsecurity/Santh"
-homepage = "https://github.com/santht/matchkit"
+repository = "https://github.com/santhreal/matchkit"
+homepage = "https://santh.dev"
 documentation = "https://docs.rs/matchkit"
-description = "Vocabulary types for multi-pattern matching — Match struct, Matcher trait, shared errors"
+description = "Vocabulary types for multi-pattern matching. Match struct, Matcher trait, shared errors"
 readme = "README.md"
 keywords = ["pattern-matching", "match", "gpu", "trait", "vocabulary"]
 categories = ["algorithms", "text-processing"]
@@ -39,17 +39,14 @@ harness = false
 name = "batch_bench"
 harness = false
 
+# `unit_all` is the aggregate runner: it `#[path]`-includes the unit, depth,
+# adversarial, integration, property, concurrent and regression modules, so
+# declaring those as standalone [[test]] targets too compiled each file TWICE.
+# Only files NOT aggregated by all.rs get their own target below
+# (test_matchkit, adversarial/break_it, and the campaign suites).
 [[test]]
 name = "unit_all"
 path = "tests/unit/all.rs"
-
-[[test]]
-name = "unit_legendary"
-path = "tests/unit/legendary.rs"
-
-[[test]]
-name = "unit"
-path = "tests/unit/mod.rs"
 
 [[test]]
 name = "unit_test_matchkit"
@@ -58,18 +55,6 @@ path = "tests/unit/test_matchkit.rs"
 [[test]]
 name = "adversarial_break_it"
 path = "tests/adversarial/break_it.rs"
-
-[[test]]
-name = "adversarial"
-path = "tests/adversarial/mod.rs"
-
-[[test]]
-name = "integration"
-path = "tests/integration/mod.rs"
-
-[[test]]
-name = "property"
-path = "tests/property/mod.rs"
 
 [[test]]
 name = "campaign_s_perf_match"
@@ -82,8 +67,4 @@ path = "tests/campaign_s_proptest_03.rs"
 [[test]]
 name = "campaign_s_proptest_03_ext"
 path = "tests/campaign_s_proptest_03_ext.rs"
-
-[[test]]
-name = "campaign_s_proptest_03_ext_min"
-path = "tests/campaign_s_proptest_03_ext_min.rs"
 

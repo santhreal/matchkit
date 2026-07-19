@@ -9,7 +9,7 @@ use matchkit::{BlockMatcher, GpuMatch, Match, MatchSet, Matcher};
 use std::collections::HashMap;
 
 // ============================================================================
-// Match struct — GPU buffer layout is CRITICAL
+// Match struct: GPU buffer layout is CRITICAL
 // ============================================================================
 
 #[test]
@@ -367,7 +367,7 @@ fn matchset_into_vec_consumes_correctly() {
 }
 
 // ============================================================================
-// Error types — all variants constructible and actionable
+// Error types, all variants constructible and actionable
 // ============================================================================
 
 #[test]
@@ -445,7 +445,7 @@ fn error_backend_actionable() {
 }
 
 // ============================================================================
-// Serialization — bytemuck round-trips
+// Serialization, bytemuck round-trips
 // ============================================================================
 
 #[test]
@@ -516,9 +516,13 @@ fn gpumatch_to_match_conversion_preserves_all_fields() {
 
 #[test]
 fn adversarial_match_end_before_start() {
-    let m = Match::new(0, 100, 50); // end < start
+    let m = Match::new(0, 100, 50); // end < start (inverted range)
     assert_eq!(m.len(), 0); // saturating sub handles it
-    assert!(!m.is_empty()); // start != end
+    // An inverted range has no extent: is_empty uses `start >= end`, so it is
+    // empty AND zero-length (consistent). The old assertion `!is_empty()` (from
+    // when is_empty compared `start == end`) contradicted the match_type.rs:127
+    // fix and the regression test inverted_match_is_empty_zero_length_*.
+    assert!(m.is_empty(), "an inverted range (start>end) must be empty");
 }
 
 #[test]
@@ -698,6 +702,7 @@ fn matchset_adversarial_bytes_all_zero_and_ones() {
     assert_eq!(
         set.len(),
         3,
-        "Alternating patterns on exact same range must only dedup to 2 extra distinct entries"
+        "the 500 alternating-pattern (10,20) inserts dedup to 2 entries that then \
+         merge by range into 1, plus the 2 disjoint edge matches"
     );
 }

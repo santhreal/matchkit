@@ -1,4 +1,4 @@
-//! S-proptest-03 — matchkit mass proptest: match-set invariants, no panic on arbitrary offsets.
+//! S-proptest-03 (matchkit mass proptest: match-set invariants, no panic on arbitrary offsets).
 
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
@@ -53,6 +53,8 @@ match_cases! {
         let mut set = MatchSet::new();
         set.extend(raw.into_iter().map(|(p, s, e)| normalized(p, s, e)));
         set.merge_overlapping();
+        // `merge_overlapping` produces a minimal covering set: overlapping ranges
+        // are collapsed regardless of pattern, so no two adjacent matches overlap.
         for pair in set.as_slice().windows(2) {
             prop_assert!(!pair[0].overlaps(&pair[1]));
         }

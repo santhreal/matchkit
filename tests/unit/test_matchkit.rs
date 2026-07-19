@@ -1,4 +1,4 @@
-//! Production-grade tests for matchkit — testing Match struct, Matcher trait, and error types.
+//! Production-grade tests for matchkit (testing Match struct, Matcher trait, and error types).
 //!
 //! These tests verify:
 //! - Match struct is exactly 12 bytes (GPU buffer layout)
@@ -34,7 +34,9 @@
 )]
 
 use bytemuck::Zeroable;
-use matchkit::{BlockMatcher, BoxedMatcher, Error, GpuMatch, Match, MatchSet, Matcher, Result};
+use matchkit::{
+    BlockMatcher, BoxedMatcher, Error, GpuMatch, Match, MatchBatch, MatchSet, Matcher, Result,
+};
 use std::error::Error as StdError;
 
 // ============================================================================
@@ -51,7 +53,7 @@ fn match_size_is_12_bytes() {
     );
 }
 
-/// Test 2: Match is #[repr(C)] — verify field offsets match GPU buffer layout
+/// Test 2: Match is #[repr(C)], verify field offsets match GPU buffer layout
 #[test]
 fn match_field_offsets_match_gpu_layout() {
     use memoffset::offset_of;
@@ -532,4 +534,47 @@ fn boxed_matcher_is_dyn_compatible() {
     let boxed: BoxedMatcher = Box::new(DynMatcher);
     let result = futures::executor::block_on(boxed.scan(b"test")).unwrap();
     assert_eq!(result.len(), 1);
+}
+
+/// An inverted range (start > end) must report empty and zero length,
+/// consistent with `len()` which saturates such a range to 0.
+#[test]
+fn inverted_match_is_empty_and_zero_length() {
+    let inverted = Match::new(7, 10, 5);
+    assert_eq!(inverted.len(), 0, "inverted range len must saturate to 0");
+    assert!(
+        inverted.is_empty(),
+        "inverted range must be empty (consistent with len()==0)"
+    );
+}
+
+/// An inverted (invalid) range has no extent and must not overlap anything,
+/// where the old `start < other.end && other.start < self.end` reported a
+/// spurious overlap.
+#[test]
+fn inverted_match_does_not_overlap() {
+    let inverted = Match::new(0, 10, 5);
+    let valid = Match::new(1, 0, 20);
+    assert!(!inverted.overlaps(&valid), "inverted range overlaps nothing");
+    assert!(!valid.overlaps(&inverted), "nothing overlaps an inverted range");
+}
+
+/// Regression: two genuinely overlapping valid ranges must still overlap.
+#[test]
+fn valid_overlapping_matches_still_overlap() {
+    let a = Match::new(0, 0, 10);
+    let b = Match::new(1, 5, 15);
+    assert!(a.overlaps(&b));
+    assert!(b.overlaps(&a));
+    let disjoint = Match::new(2, 20, 30);
+    assert!(!a.overlaps(&disjoint));
+}
+
+/// MatchBatch round-trips through SoA and back without panicking or losing data.
+#[test]
+fn match_batch_into_vec_round_trips() {
+    let matches = [Match::new(0, 1, 2), Match::new(3, 4, 5), Match::new(6, 7, 8)];
+    let batch = MatchBatch::from_slice(&matches);
+    let back = batch.into_vec();
+    assert_eq!(back, matches.to_vec());
 }

@@ -1,4 +1,4 @@
-//! S-perf-match campaign catalog — +40 focused unit cases for matchkit vocabulary types.
+//! S-perf-match campaign catalog: +40 focused unit cases for matchkit vocabulary types.
 
 #![allow(clippy::unwrap_used)]
 
@@ -189,12 +189,15 @@ fn campaign_matchset_try_filter() {
 }
 
 #[test]
-fn campaign_matchset_merge_disjoint_patterns() {
+fn campaign_matchset_merge_cross_pattern_same_span() {
+    // merge_overlapping produces a minimal covering set: two patterns covering
+    // the exact same span overlap, so they collapse into one interval (which
+    // keeps the earlier-starting match's pattern id).
     let mut set = MatchSet::new();
     set.insert(Match::new(0, 0, 5));
     set.insert(Match::new(1, 0, 5));
     set.merge_overlapping();
-    assert_eq!(set.len(), 2);
+    assert_eq!(set.len(), 1);
 }
 
 #[test]

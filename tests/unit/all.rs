@@ -30,7 +30,7 @@ mod adversarial;
 mod concurrent;
 #[path = "../integration/mod.rs"]
 mod integration;
-mod legendary;
+mod depth;
 #[path = "../property/mod.rs"]
 mod property;
 #[path = "../regression/mod.rs"]

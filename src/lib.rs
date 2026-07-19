@@ -1,11 +1,11 @@
-//! # matchkit — vocabulary types for multi-pattern matching
+//! # matchkit, vocabulary types for multi-pattern matching
 //!
 //! `matchkit` provides the shared types that every crate in the Santh
 //! performance ecosystem depends on: the [`Match`] struct, the [`Matcher`]
 //! and [`BlockMatcher`] traits, and common error definitions.
 //!
 //! By isolating these types into a zero-dependency vocabulary crate,
-//! consumer crates like `simdsieve`, `warpstate`, `warpsearch`, and
+//! consumer crates like `simdsieve`, `vyre`, `warpsearch`, and
 //! `warpgrep` can all agree on a single match representation without
 //! pulling in heavyweight GPU or regex dependencies.
 //!

@@ -1,4 +1,4 @@
-/// GPU-internal match representation — 3×u32, `bytemuck`-compatible.
+/// GPU-internal match representation: 3×u32, `bytemuck`-compatible.
 ///
 /// This type maps directly to the GPU output buffer layout where each
 /// match occupies exactly 12 bytes (3 × `u32`). The fields are:
@@ -98,7 +98,7 @@ impl Match {
         }
     }
 
-    /// Legacy constructor (compatibility with from_parts).
+    /// Legacy alias for [`Match::new`], retained for API compatibility.
     #[must_use]
     pub const fn from_parts(pattern_id: u32, start: u32, end: u32) -> Self {
         Self::new(pattern_id, start, end)
@@ -111,8 +111,15 @@ impl Match {
     }
 
     /// Returns `true` if this match's byte range overlaps with `other`.
+    ///
+    /// An inverted (invalid) range (`start > end`) has no meaningful extent and
+    /// overlaps nothing; without this guard `[10, 5)` spuriously reported an
+    /// overlap with ranges it does not intersect.
     #[must_use]
     pub const fn overlaps(&self, other: &Match) -> bool {
+        if self.start > self.end || other.start > other.end {
+            return false;
+        }
         self.start < other.end && other.start < self.end
     }
 
@@ -123,9 +130,13 @@ impl Match {
     }
 
     /// Returns `true` if the match has zero length.
+    ///
+    /// Uses `>=` so an inverted range (`start > end`) is also reported empty,
+    /// staying consistent with [`len`](Self::len), which saturates such a range
+    /// to `0`.
     #[must_use]
     pub const fn is_empty(&self) -> bool {
-        self.start == self.end
+        self.start >= self.end
     }
 }
 
@@ -175,14 +186,46 @@ impl MatchBatch {
         Self::default()
     }
 
+    /// Maximum element capacity for one SoA `Vec<u32>` column, i.e. the largest
+    /// request that cannot trigger a `Vec` capacity-overflow panic.
+    #[must_use]
+    fn max_capacity() -> usize {
+        (isize::MAX as usize) / std::mem::size_of::<u32>()
+    }
+
     /// Create a batch with pre-allocated capacity.
+    ///
+    /// `cap` is clamped to [`max_capacity`](Self::max_capacity) so an untrusted
+    /// size cannot trigger a capacity-overflow panic. This constructor still
+    /// aborts if the underlying allocation itself fails; for OOM-safe
+    /// allocation of untrusted sizes use
+    /// [`try_with_capacity`](Self::try_with_capacity).
     #[must_use]
     pub fn with_capacity(cap: usize) -> Self {
+        let cap = cap.min(Self::max_capacity());
         Self {
             pattern_ids: Vec::with_capacity(cap),
             starts: Vec::with_capacity(cap),
             ends: Vec::with_capacity(cap),
         }
+    }
+
+    /// OOM-safe [`with_capacity`](Self::with_capacity): returns
+    /// [`Error::OutOfMemory`](crate::error::Error::OutOfMemory) instead of
+    /// aborting when a column reservation fails. Unlike the infallible
+    /// constructor it attempts the exact requested size and reports failure
+    /// (a hostile `cap` yields `OutOfMemory`, never an abort), consistent with
+    /// [`MatchSet::try_with_capacity`](crate::MatchSet::try_with_capacity).
+    pub fn try_with_capacity(cap: usize) -> crate::error::Result<Self> {
+        let mut batch = Self::new();
+        for column in [&mut batch.pattern_ids, &mut batch.starts, &mut batch.ends] {
+            column
+                .try_reserve(cap)
+                .map_err(|e| crate::error::Error::OutOfMemory {
+                    message: e.to_string(),
+                })?;
+        }
+        Ok(batch)
     }
 
     /// Number of matches in the batch.
@@ -204,6 +247,25 @@ impl MatchBatch {
         self.ends.push(m.end);
     }
 
+    /// OOM-safe [`push`](Self::push): returns
+    /// [`Error::OutOfMemory`](crate::error::Error::OutOfMemory) instead of
+    /// aborting if growing a column fails.
+    ///
+    /// All three columns are reserved before any push, so a failed reservation
+    /// leaves the batch unchanged (the SoA columns stay equal-length).
+    pub fn try_push(&mut self, m: Match) -> crate::error::Result<()> {
+        let oom = |e: std::collections::TryReserveError| crate::error::Error::OutOfMemory {
+            message: e.to_string(),
+        };
+        self.pattern_ids.try_reserve(1).map_err(oom)?;
+        self.starts.try_reserve(1).map_err(oom)?;
+        self.ends.try_reserve(1).map_err(oom)?;
+        self.pattern_ids.push(m.pattern_id);
+        self.starts.push(m.start);
+        self.ends.push(m.end);
+        Ok(())
+    }
+
     /// Clear the batch.
     pub fn clear(&mut self) {
         self.pattern_ids.clear();
@@ -222,16 +284,29 @@ impl MatchBatch {
     }
 
     /// Convert SoA batch to AoS vector.
+    ///
+    /// The three field vectors are `pub`, so a caller can leave them at
+    /// mismatched lengths. Zipping them is panic-free (it stops at the shortest)
+    /// where the old `starts[i]`/`ends[i]` indexing by `pattern_ids.len()` would
+    /// panic on a short `starts`/`ends`. A `debug_assert` surfaces the broken
+    /// length invariant during testing.
     #[must_use]
     pub fn into_vec(self) -> Vec<Match> {
-        let mut matches = Vec::with_capacity(self.len());
-        for i in 0..self.len() {
-            matches.push(Match::new(
-                self.pattern_ids[i],
-                self.starts[i],
-                self.ends[i],
-            ));
-        }
-        matches
+        debug_assert_eq!(
+            self.pattern_ids.len(),
+            self.starts.len(),
+            "MatchBatch pattern_ids and starts length mismatch"
+        );
+        debug_assert_eq!(
+            self.pattern_ids.len(),
+            self.ends.len(),
+            "MatchBatch pattern_ids and ends length mismatch"
+        );
+        self.pattern_ids
+            .into_iter()
+            .zip(self.starts)
+            .zip(self.ends)
+            .map(|((pattern_id, start), end)| Match::new(pattern_id, start, end))
+            .collect()
     }
 }

@@ -51,7 +51,7 @@ impl MatchSet {
 
     /// Create a match set with pre-allocated capacity.
     ///
-    /// `cap` is clamped to [`max_capacity`](Self::max_capacity) to prevent a
+    /// `cap` is clamped to `max_capacity` to prevent a
     /// capacity-overflow panic from untrusted input. This constructor still
     /// aborts if the underlying allocation fails; for OOM-safe allocation of
     /// untrusted sizes use [`try_with_capacity`](Self::try_with_capacity).

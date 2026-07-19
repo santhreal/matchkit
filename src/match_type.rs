@@ -195,7 +195,7 @@ impl MatchBatch {
 
     /// Create a batch with pre-allocated capacity.
     ///
-    /// `cap` is clamped to [`max_capacity`](Self::max_capacity) so an untrusted
+    /// `cap` is clamped to `max_capacity` so an untrusted
     /// size cannot trigger a capacity-overflow panic. This constructor still
     /// aborts if the underlying allocation itself fails; for OOM-safe
     /// allocation of untrusted sizes use

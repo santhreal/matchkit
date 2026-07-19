@@ -103,7 +103,7 @@ match_cases! {
     p09_is_empty_consistent => |raw| {
         let mut set = MatchSet::new();
         set.extend(raw.into_iter().map(|(p, s, e)| mk(p, s, e)));
-        prop_assert_eq!(set.is_empty(), set.len() == 0);
+        prop_assert_eq!(set.is_empty(), set.len().eq(&0));
     },
     p10_pattern_ids_sorted => |raw| {
         let mut set = MatchSet::new();
@@ -114,4 +114,3 @@ match_cases! {
         }
     },
 }
-

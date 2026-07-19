@@ -161,10 +161,7 @@ fn campaign_match_is_empty_zero_len() {
 
 #[test]
 fn campaign_match_from_parts_alias() {
-    assert_eq!(
-        Match::from_parts(9, 1, 2),
-        Match::new(9, 1, 2)
-    );
+    assert_eq!(Match::from_parts(9, 1, 2), Match::new(9, 1, 2));
 }
 
 #[test]

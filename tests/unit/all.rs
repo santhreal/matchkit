@@ -28,9 +28,9 @@
 mod adversarial;
 #[path = "../concurrent/mod.rs"]
 mod concurrent;
+mod depth;
 #[path = "../integration/mod.rs"]
 mod integration;
-mod depth;
 #[path = "../property/mod.rs"]
 mod property;
 #[path = "../regression/mod.rs"]

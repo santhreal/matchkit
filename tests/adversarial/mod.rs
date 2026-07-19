@@ -518,10 +518,10 @@ fn gpumatch_to_match_conversion_preserves_all_fields() {
 fn adversarial_match_end_before_start() {
     let m = Match::new(0, 100, 50); // end < start (inverted range)
     assert_eq!(m.len(), 0); // saturating sub handles it
-    // An inverted range has no extent: is_empty uses `start >= end`, so it is
-    // empty AND zero-length (consistent). The old assertion `!is_empty()` (from
-    // when is_empty compared `start == end`) contradicted the match_type.rs:127
-    // fix and the regression test inverted_match_is_empty_zero_length_*.
+                            // An inverted range has no extent: is_empty uses `start >= end`, so it is
+                            // empty AND zero-length (consistent). The old assertion `!is_empty()` (from
+                            // when is_empty compared `start == end`) contradicted the match_type.rs:127
+                            // fix and the regression test inverted_match_is_empty_zero_length_*.
     assert!(m.is_empty(), "an inverted range (start>end) must be empty");
 }
 

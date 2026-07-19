@@ -26,7 +26,11 @@ fn inverted_match_is_empty_zero_length_and_non_overlapping() {
 /// another's length.
 #[test]
 fn match_batch_into_vec_round_trips_aos() {
-    let matches = [Match::new(1, 0, 4), Match::new(2, 4, 9), Match::new(3, 9, 20)];
+    let matches = [
+        Match::new(1, 0, 4),
+        Match::new(2, 4, 9),
+        Match::new(3, 9, 20),
+    ];
     let batch = MatchBatch::from_slice(&matches);
     assert_eq!(batch.len(), 3);
     let round_tripped = batch.into_vec();
@@ -82,7 +86,9 @@ fn try_with_capacity_is_reasonable_and_fails_loud_on_hostile_size() {
 fn try_push_keeps_soa_columns_consistent() {
     let mut batch = MatchBatch::new();
     for i in 0..50u32 {
-        batch.try_push(Match::new(i, i, i + 1)).expect("push under memory pressure-free");
+        batch
+            .try_push(Match::new(i, i, i + 1))
+            .expect("push under memory pressure-free");
     }
     assert_eq!(batch.len(), 50);
     assert_eq!(batch.pattern_ids.len(), batch.starts.len());

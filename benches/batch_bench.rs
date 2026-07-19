@@ -1,5 +1,6 @@
 //! Criterion bench for MatchBatch SoA conversions.
 
+#![allow(missing_docs)]
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
 use matchkit::{Match, MatchBatch};
 

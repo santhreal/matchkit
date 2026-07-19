@@ -555,8 +555,14 @@ fn inverted_match_is_empty_and_zero_length() {
 fn inverted_match_does_not_overlap() {
     let inverted = Match::new(0, 10, 5);
     let valid = Match::new(1, 0, 20);
-    assert!(!inverted.overlaps(&valid), "inverted range overlaps nothing");
-    assert!(!valid.overlaps(&inverted), "nothing overlaps an inverted range");
+    assert!(
+        !inverted.overlaps(&valid),
+        "inverted range overlaps nothing"
+    );
+    assert!(
+        !valid.overlaps(&inverted),
+        "nothing overlaps an inverted range"
+    );
 }
 
 /// Regression: two genuinely overlapping valid ranges must still overlap.
@@ -573,7 +579,11 @@ fn valid_overlapping_matches_still_overlap() {
 /// MatchBatch round-trips through SoA and back without panicking or losing data.
 #[test]
 fn match_batch_into_vec_round_trips() {
-    let matches = [Match::new(0, 1, 2), Match::new(3, 4, 5), Match::new(6, 7, 8)];
+    let matches = [
+        Match::new(0, 1, 2),
+        Match::new(3, 4, 5),
+        Match::new(6, 7, 8),
+    ];
     let batch = MatchBatch::from_slice(&matches);
     let back = batch.into_vec();
     assert_eq!(back, matches.to_vec());

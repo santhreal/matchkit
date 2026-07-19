@@ -127,6 +127,7 @@ impl MatchSet {
     /// Pattern ID is taken from the first match in each merged group.
     ///
     /// Note: This operation is zero-allocation and O(n) time.
+    #[allow(clippy::unnecessary_wraps)] // Result kept for try_* OOM-safe API symmetry
     pub fn try_merge_overlapping(&mut self) -> crate::error::Result<()> {
         self.merge_overlapping();
         Ok(())
